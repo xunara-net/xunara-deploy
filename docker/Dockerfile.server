@@ -1,0 +1,22 @@
+# xunara-server 镜像（在 xunara-server 仓库根目录执行）：
+#   docker build -f docker/Dockerfile.server -t ghcr.io/xunara-net/xunara-server:dev .
+#
+# 产物是 distroless 静态镜像：无 shell、无包管理器，只有控制面二进制。
+ARG GO_VERSION=1.27
+FROM golang:${GO_VERSION}-alpine AS build
+WORKDIR /src
+# 先拉依赖，让代码改动命中缓存。
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -trimpath \
+        -ldflags "-s -w -X github.com/xunara-net/xunara-server/control.Version=${VERSION}" \
+        -o /out/xunarad ./cmd/xunarad
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/xunarad /usr/local/bin/xunarad
+# 状态目录由 compose 卷挂载，容器内用户 nonroot(65532) 需要写权限。
+USER nonroot
+EXPOSE 9090 9191
+ENTRYPOINT ["/usr/local/bin/xunarad"]

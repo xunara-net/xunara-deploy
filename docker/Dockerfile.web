@@ -1,0 +1,29 @@
+# xunara-web + xunara-admin 同源镜像：
+#
+#   docker build -f docker/Dockerfile.web -t ghcr.io/xunara-net/xunara-web:dev .
+#
+# 构建上下文是本仓库（xunara-deploy）。Dockerfile 会从 GitHub 拉取两个前端仓库
+# 并各自构建，最后用 nginx 同源托管：
+#   /        → xunara-web
+#   /admin/  → xunara-admin
+# 控制面地址由 nginx 配置里的 upstream 决定（compose 里是 server:9090）。
+ARG NODE_VERSION=22
+FROM node:${NODE_VERSION}-alpine AS web
+ARG XUNARA_REF=main
+RUN apk add --no-cache git \
+ && git clone --depth 1 --branch "${XUNARA_REF}" https://github.com/xunara-net/xunara-web.git /src
+WORKDIR /src
+RUN npm ci --no-audit --no-fund && npm run build
+
+FROM node:${NODE_VERSION}-alpine AS admin
+ARG XUNARA_REF=main
+RUN apk add --no-cache git \
+ && git clone --depth 1 --branch "${XUNARA_REF}" https://github.com/xunara-net/xunara-admin.git /src
+WORKDIR /src
+RUN npm ci --no-audit --no-fund && npm run build
+
+FROM nginx:1.27-alpine
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=web   /src/dist /srv/xunara/web
+COPY --from=admin /src/dist /srv/xunara/admin
+EXPOSE 80

@@ -1,0 +1,20 @@
+# xunara-relay 镜像（在 xunara-relay 仓库根目录执行）：
+#   docker build -f docker/Dockerfile.relay -t ghcr.io/xunara-net/xunara-relay:dev .
+#
+# 中继是数据面：只暴露 DERP/STUN 端口，不接业务 API。
+ARG GO_VERSION=1.27
+FROM golang:${GO_VERSION}-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -trimpath \
+        -ldflags "-s -w -X main.version=${VERSION}" \
+        -o /out/xunara-relay ./cmd/xunara-relay
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/xunara-relay /usr/local/bin/xunara-relay
+USER nonroot
+EXPOSE 9091 3478/udp
+ENTRYPOINT ["/usr/local/bin/xunara-relay"]

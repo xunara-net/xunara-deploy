@@ -1,0 +1,5 @@
+# Local build artifacts and scratch files
+/docker/.env
+/dist/
+*.tar.gz
+.run/

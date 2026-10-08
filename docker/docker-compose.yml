@@ -1,0 +1,95 @@
+# Xunara 一体化编排：控制面 + 中继 + 同源前端（nginx）。
+#
+#   先复制 env 模板并填入 secret：
+#     cp docker/xunara.env.example docker/.env && chmod 600 docker/.env
+#   启动：
+#     cd docker && docker compose up -d
+#
+# 默认拉取 GHCR 镜像；从源码构建见 docker/*.Dockerfile（README「Docker 部署」）。
+# 公网端口：80/443（用户控制台 + 管理后台 + 控制面 API，由 nginx 统一入口）、
+# 9091（DERP 中继，客户端直连，不经过 nginx）。
+name: xunara
+
+services:
+  # 具名卷默认属于 root，而两个守护进程都以 nonroot(65532) 运行；先修一次属主。
+  init:
+    image: alpine:3.20
+    command: ["sh", "-c", "chown -R 65532:65532 /var/lib/xunara /var/lib/xunara-relay"]
+    restart: "no"
+    volumes:
+      - xunara-state:/var/lib/xunara
+      - xunara-relay:/var/lib/xunara-relay
+
+  server:
+    image: ghcr.io/xunara-net/xunara-server:${XUNARA_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command:
+      - -listen
+      - 0.0.0.0:9090
+      - -server-url
+      - ${XUNARA_SERVER_URL:-http://localhost}
+      - -state-dir
+      - /var/lib/xunara
+      # 平台 gRPC 只在 compose 网络内可达，绝不映射到宿主机。
+      - -grpc-listen
+      - 0.0.0.0:9191
+      - -console-timezone
+      - ${XUNARA_TIMEZONE:-Asia/Shanghai}
+      - -log-level
+      - ${XUNARA_LOG_LEVEL:-info}
+      - -allow-local-login
+      - -passkey=${XUNARA_PASSKEY:-false}
+    env_file:
+      - ./.env
+    volumes:
+      - xunara-state:/var/lib/xunara
+    expose:
+      - "9090"
+      - "9191"
+
+  relay:
+    image: ghcr.io/xunara-net/xunara-relay:${XUNARA_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      server:
+        condition: service_started
+    command:
+      - -listen
+      - 0.0.0.0:9091
+      - -hostname
+      - ${XUNARA_DERP_HOST:-localhost}
+      - -state-dir
+      - /var/lib/xunara-relay
+      - -cert-mode
+      - selfsigned
+      - -cert-dir
+      - /var/lib/xunara-relay/certs
+      - -derp-map-out
+      - /var/lib/xunara-relay/derp.json
+      # 单机 compose 用独立模式：准入走控制面 /derp/admit，控制面不可达即拒绝放行。
+      - -verify-url
+      - http://server:9090/derp/admit
+      - -log-level
+      - ${XUNARA_LOG_LEVEL:-info}
+    ports:
+      - "${XUNARA_DERP_PORT:-9091}:9091"
+      - "${XUNARA_STUN_PORT:-3478}:3478/udp"
+    volumes:
+      - xunara-relay:/var/lib/xunara-relay
+
+  web:
+    image: ghcr.io/xunara-net/xunara-web:${XUNARA_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "${XUNARA_HTTP_PORT:-80}:80"
+
+volumes:
+  xunara-state:
+  xunara-relay:
