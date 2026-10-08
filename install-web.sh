@@ -54,6 +54,8 @@ if command -v nginx >/dev/null 2>&1; then
 fi
 
 echo "installed web:   $root/web"
-[ -n "$ADMIN" ] && echo "installed admin: $root/admin"
+if [ -n "$ADMIN" ]; then
+	echo "installed admin: $root/admin"
+fi
 echo "nginx config: /etc/nginx/conf.d/xunara.conf"
 echo "确保 80/443 已在防火墙放行；控制面 API 由 nginx 反代到 127.0.0.1:9090。"
