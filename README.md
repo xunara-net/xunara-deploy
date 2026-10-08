@@ -99,7 +99,8 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 \
   控制面不可达即拒绝放行。
 - **托管模式**：`XUNARA_RELAY_MANAGED=1` 时用 `-control-url` + 一次性
   `XUNARA_RELAY_ENROLL_TOKEN` 注册并心跳。注册契约见 xunara-relay 仓库
-  `docs/relay-protocol.md`；控制面的 `/api/relay/v1/*` 尚未实现前，请用独立模式。
+  `docs/relay-protocol.md`。控制面已实现 `/api/relay/v1/*`（注册与心跳），中继配额由
+  套餐的 `max_relays` 控制（内置 Free 1 / Pro 5 / Business 20）；独立模式仍然可用。
 
 ```sh
 sudo journalctl -u xunara-relay -n 20   # 证书指纹打印在启动日志里
