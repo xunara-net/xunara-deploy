@@ -25,6 +25,10 @@ fi
 
 here=$(cd "$(dirname "$0")" && pwd)
 root=/srv/xunara
+# 公网端口与上游：nginx 默认接 80，控制面默认在 127.0.0.1:9090。
+# 控制面不在 9090（例如已经让给 nginx）时用 XUNARA_UPSTREAM 指过去。
+http_port=${XUNARA_HTTP_PORT:-80}
+upstream=${XUNARA_UPSTREAM:-127.0.0.1:9090}
 
 install -d -o root -g root -m 0755 "$root/web"
 # --delete 保证旧构建里删掉的页面不会残留；dist 内容原样拷贝。
@@ -46,7 +50,11 @@ if [ -n "$ADMIN" ]; then
 fi
 
 install -d -o root -g root -m 0755 /etc/nginx/conf.d
-install -o root -g root -m 0644 "$here/nginx/xunara.conf" /etc/nginx/conf.d/xunara.conf
+sed -e "s|@XUNARA_HTTP_PORT_IPV4@|$http_port|" \
+	-e "s|@XUNARA_HTTP_PORT@|$http_port|" \
+	-e "s|@XUNARA_UPSTREAM@|$upstream|" \
+	"$here/nginx/xunara.conf" >/etc/nginx/conf.d/xunara.conf
+chmod 0644 /etc/nginx/conf.d/xunara.conf
 
 if command -v nginx >/dev/null 2>&1; then
 	nginx -t
@@ -58,4 +66,5 @@ if [ -n "$ADMIN" ]; then
 	echo "installed admin: $root/admin"
 fi
 echo "nginx config: /etc/nginx/conf.d/xunara.conf"
+echo "listen:       $http_port   upstream: $upstream"
 echo "确保 80/443 已在防火墙放行；控制面 API 由 nginx 反代到 127.0.0.1:9090。"

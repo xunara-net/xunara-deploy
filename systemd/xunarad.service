@@ -24,10 +24,10 @@ StateDirectoryMode=0700
 # API stays private because it is meant to be reachable only from the host or a
 # firewall allowlist.
 ExecStart=/opt/xunara/bin/xunarad \
-    -listen 0.0.0.0:9090 \
+    -listen @XUNARA_LISTEN@ \
     -server-url @XUNARA_SERVER_URL@ \
     -state-dir /var/lib/xunara \
-    -grpc-listen 127.0.0.1:9191 \
+    -grpc-listen @XUNARA_GRPC_LISTEN@ \
     -console-timezone Asia/Shanghai \
     -log-level info \
     -allow-local-login \

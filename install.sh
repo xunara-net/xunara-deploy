@@ -19,6 +19,11 @@
 #
 # 可选环境变量：
 #   XUNARA_SERVER_URL        控制面对外基址（默认 http://<主机名>:9090）
+#   XUNARA_LISTEN            控制面监听地址（默认 0.0.0.0:9090；nginx 同源部署时
+#                            改成 127.0.0.1:9190 并把公网端口交给 nginx）
+#   XUNARA_GRPC_LISTEN       平台 gRPC 监听地址（默认 127.0.0.1:9191）
+#   XUNARA_EXTRA_ARGS        追加到 ExecStart 的额外参数（如
+#                            "-derp-map /var/lib/xunara-veil/derp.json -plans builtin"）
 #   XUNARA_PASSKEY           true/false，WebAuthn 需要 https 或 localhost（默认 false）
 #   XUNARA_PREFIX            安装前缀（默认 /opt/xunara）
 #   XUNARA_STATE             控制面状态目录（默认 /var/lib/xunara）
@@ -52,6 +57,8 @@ relay_map=$relay_state/derp.json
 derp_port=${XUNARA_DERP_PORT:-9091}
 control_addr=${XUNARA_CONTROL_ADDR:-127.0.0.1:9090}
 server_url=${XUNARA_SERVER_URL:-http://$(hostname -f 2>/dev/null || hostname):9090}
+listen_addr=${XUNARA_LISTEN:-0.0.0.0:9090}
+grpc_listen=${XUNARA_GRPC_LISTEN:-127.0.0.1:9191}
 passkey=${XUNARA_PASSKEY:-false}
 
 # sed 替换值里可能出现的分隔符与反斜杠，避免把单元文件写坏。
@@ -122,10 +129,12 @@ if [ -n "${XUNARA_DERP_HOST:-}" ]; then
 	relay_extra_args="-derp-map $relay_map"
 fi
 
-# 渲染控制面单元：server-url、passkey 与 DERP map 都在这里落定。
-sed -e "s|@XUNARA_SERVER_URL@|$(escape "$server_url")|" \
+# 渲染控制面单元：监听地址、server-url、passkey、DERP map 与额外参数都在这里落定。
+sed -e "s|@XUNARA_LISTEN@|$(escape "$listen_addr")|" \
+	-e "s|@XUNARA_GRPC_LISTEN@|$(escape "$grpc_listen")|" \
+	-e "s|@XUNARA_SERVER_URL@|$(escape "$server_url")|" \
 	-e "s|@XUNARA_PASSKEY@|$passkey|" \
-	-e "s|@XUNARA_EXTRA_ARGS@|$(escape "$relay_extra_args")|" \
+	-e "s|@XUNARA_EXTRA_ARGS@|$(escape "$relay_extra_args ${XUNARA_EXTRA_ARGS:-}")|" \
 	"$here/systemd/xunarad.service" >/etc/systemd/system/xunarad.service
 chmod 0644 /etc/systemd/system/xunarad.service
 
@@ -151,6 +160,7 @@ fi
 echo
 echo "installed $("$prefix/bin/xunarad" -version 2>/dev/null || echo "$BIN")"
 echo "state: $state   config: $conf   unit: /etc/systemd/system/xunarad.service"
+echo "listen: $listen_addr   server-url: $server_url"
 if [ -n "${XUNARA_DERP_HOST:-}" ]; then
 	echo "relay: $XUNARA_DERP_HOST:$derp_port   map: $relay_map (CertName 即 sha256-raw 指纹)"
 fi

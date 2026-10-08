@@ -53,6 +53,20 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 `install.sh` 可重复执行，就是升级路径：先备份 `/opt/xunara/bin/xunarad.previous`，
 再安装账号、状态目录、单元文件，最后 `enable --now`。
 
+安装参数（都通过环境变量传入）：
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `XUNARA_SERVER_URL` | `http://<主机名>:9090` | 对外基址，必须与浏览器访问地址一致 |
+| `XUNARA_LISTEN` | `0.0.0.0:9090` | 控制面监听地址；nginx 同源部署时改成 `127.0.0.1:9190` |
+| `XUNARA_GRPC_LISTEN` | `127.0.0.1:9191` | 平台 gRPC，保持内网 |
+| `XUNARA_EXTRA_ARGS` | 空 | 追加到 ExecStart（如 `-derp-map … -plans builtin`） |
+| `XUNARA_PASSKEY` | `false` | WebAuthn 需要 https 或 localhost |
+| `XUNARA_DERP_HOST` | 空 | 设置后一并部署 `xunara-relay` 并接入 DERP map |
+
+`install-web.sh` 同样接受 `XUNARA_HTTP_PORT`（默认 80）与 `XUNARA_UPSTREAM`
+（默认 `127.0.0.1:9090`）；公网端口让给 nginx 时把上游指到控制面的实际端口。
+
 ### 首次初始化（必做）
 
 全新部署**没有**管理员密码，第一次必须用服务写出的一次性令牌创建管理员：

@@ -27,7 +27,9 @@ jobs:
       - name: Render systemd units
         run: |
           # 用安装脚本同样的占位符替换语法渲染一遍，能发现忘写的 @变量@。
-          sed -e 's|@XUNARA_SERVER_URL@|http://example.com|' \
+          sed -e 's|@XUNARA_LISTEN@|0.0.0.0:9090|' \
+              -e 's|@XUNARA_GRPC_LISTEN@|127.0.0.1:9191|' \
+              -e 's|@XUNARA_SERVER_URL@|http://example.com|' \
               -e 's|@XUNARA_PASSKEY@|false|' \
               -e 's|@XUNARA_EXTRA_ARGS@||' \
               systemd/xunarad.service > /tmp/xunarad.service
@@ -40,8 +42,11 @@ jobs:
 
       - name: nginx config test
         run: |
-          # 本机部署配置：上游是 127.0.0.1:9090，可直接在本 runner 校验。
-          docker run --rm -v "$PWD/nginx/xunara.conf:/etc/nginx/conf.d/xunara.conf:ro" \
+          # 模板先按 install-web.sh 的规则渲染，再交给 nginx 校验。
+          sed -e 's|@XUNARA_HTTP_PORT_IPV4@|80|' -e 's|@XUNARA_HTTP_PORT@|80|' \
+              -e 's|@XUNARA_UPSTREAM@|127.0.0.1:9090|' \
+              nginx/xunara.conf > /tmp/xunara.conf
+          docker run --rm -v "/tmp/xunara.conf:/etc/nginx/conf.d/xunara.conf:ro" \
             nginx:1.27-alpine nginx -t
           # compose 配置：上游主机名 server 只在容器网络里可解析，用 --add-host 补齐。
           docker run --rm --add-host server:127.0.0.1 \
