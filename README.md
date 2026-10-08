@@ -31,11 +31,16 @@ docker/xunara.env.example       Compose 环境文件模板
 
 | 端口 | 归属 | 暴露范围 |
 |---|---|---|
-| 80/443 | nginx（xunara-web / xunara-admin / 控制面 API 反代） | 公网 |
-| 9090 | xunarad HTTP（nginx 的上游） | 仅本机/容器网络 |
+| 80/443（或任意单端口，如 9090） | nginx（xunara-web / xunara-admin / 控制面 API 反代） | 公网 |
+| 9090 → 9190 | xunarad HTTP（nginx 的**上游**，`XUNARA_LISTEN=127.0.0.1:9190`） | 仅本机/容器网络 |
 | 9091 | xunara-relay DERP（客户端直连，**不要**经过 nginx） | 公网 |
 | 3478/udp | STUN（可选，能提高直连成功率） | 公网 |
 | 9191 | 平台 gRPC `PlatformService`（Bearer token，fail closed） | 仅本机/内网 |
+
+只有 nginx 面对公网：它是唯一同时提供用户控制台、超管后台与控制面 API 的入口，
+三个角色因此天然同源。控制面**不要**再监听公网地址。若主机只放行了 9090，
+就让 nginx 监听 9090（`XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127.0.0.1:9190`），
+控制面退到 9190。
 
 ## systemd 部署（单机）
 
@@ -60,12 +65,25 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 | `XUNARA_SERVER_URL` | `http://<主机名>:9090` | 对外基址，必须与浏览器访问地址一致 |
 | `XUNARA_LISTEN` | `0.0.0.0:9090` | 控制面监听地址；nginx 同源部署时改成 `127.0.0.1:9190` |
 | `XUNARA_GRPC_LISTEN` | `127.0.0.1:9191` | 平台 gRPC，保持内网 |
-| `XUNARA_EXTRA_ARGS` | 空 | 追加到 ExecStart（如 `-derp-map … -plans builtin`） |
+| `XUNARA_EXTRA_ARGS` | 空 | 追加到 ExecStart（如 `-derp-map /var/lib/xunara-relay/derp.json`） |
 | `XUNARA_PASSKEY` | `false` | WebAuthn 需要 https 或 localhost |
 | `XUNARA_DERP_HOST` | 空 | 设置后一并部署 `xunara-relay` 并接入 DERP map |
 
-`install-web.sh` 同样接受 `XUNARA_HTTP_PORT`（默认 80）与 `XUNARA_UPSTREAM`
-（默认 `127.0.0.1:9090`）；公网端口让给 nginx 时把上游指到控制面的实际端口。
+`install-web.sh` 同样接受 `XUNARA_HTTP_PORT`（默认 80，公网端口让给 nginx 时改成
+对外端口，如 9090）与 `XUNARA_UPSTREAM`（默认 `127.0.0.1:9090`，指向控制面的实际
+监听地址）。两个值必须与 `XUNARA_LISTEN` 对得上：
+
+```sh
+# 单端口同源部署（主机只放行 9090）：控制面退到 9190，nginx 占 9090
+ssh root@host 'XUNARA_LISTEN=127.0.0.1:9190 XUNARA_GRPC_LISTEN=127.0.0.1:9191 \
+  XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
+ssh root@host 'XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127.0.0.1:9190 \
+  ./install-web.sh /tmp/web-dist /tmp/admin-dist'
+```
+
+同源站点里 `/` 是用户控制台（未登录会跳到 `/login`），`/admin/` 是超管后台，
+控制面 API 与客户端协议端点按前缀反代。`/login` 的 GET 交给控制台 SPA，POST 仍然
+是控制面的旧版表单登录。
 
 ### 首次初始化（必做）
 
@@ -89,8 +107,8 @@ ssh root@host './install-web.sh /tmp/web-dist /tmp/admin-dist'
 ```
 
 `install-web.sh` 把静态文件装到 `/srv/xunara/{web,admin}`，写入
-`/etc/nginx/conf.d/xunara.conf` 并 `nginx -t`。控制面**必须**保持
-`-listen 0.0.0.0:9090`（上游）且只对 nginx 可达。
+`/etc/nginx/conf.d/xunara.conf` 并 `nginx -t`。控制面只对 nginx 可达（`127.0.0.1`），
+公网端口归 nginx。
 
 会话 Cookie 是 HttpOnly + SameSite=Lax：**控制台必须和 API 同源**，不要把
 `xunara-web` 单独部署到另一个域名。
@@ -165,6 +183,20 @@ Session 存在状态目录而不是进程内存：重启不掉登录，也是多
 中继状态在 `/var/lib/xunara-relay`：DERP 节点密钥、自签名证书与 `derp.json`。
 丢失后需要重新下发指纹。
 
+## 套餐（可选）
+
+`-plans` 为空时**没有**任何套餐配额，这是自托管的默认：所有租户无限设备、无限成员。
+只有真的要卖套餐（Free / Pro / Business 或自己的 JSON 目录）时才加：
+
+```sh
+XUNARA_EXTRA_ARGS="-plans builtin"   # 或 -plans /etc/xunara/plans.json
+```
+
+内置目录：Free 10 设备 / 1 成员，Pro 50 / 5，Business 200 / 50。配额在
+Xunara 控制面强制（例如第 11 台设备返回 `DEVICE_LIMIT_REACHED`），Headscale/Tailscale
+客户端协议不参与商业规则。租户套餐用超管后台或 `PATCH
+/api/platform/v1/organizations/{org}/plan` 调整。
+
 ## 配置
 
 改 `/etc/systemd/system/xunarad.service` 的 `ExecStart`（监听地址、`-server-url`、
@@ -194,7 +226,10 @@ RP ID 是域名，**不要**用 IP 部署通行密钥。
 | 客户端一直「连接中」 | 没有可用 DERP：检查 `-derp-map` 是否接进控制面、9091 是否公网可达 |
 | `/admin/` 404 | 未安装 admin dist，或未在 `install-web.sh` 传第二个参数 |
 | 升级后二进制没变 | 运行中的二进制被 systemd 占用时 `install` 会写失败：先 `systemctl stop xunarad` |
-| 平台 API 401 | 未配 `XUNARA_PLATFORM_ADMIN_TOKEN`，平台 API 默认 fail closed |
+| 平台 API 401 / `/admin/` 登录失败 | 未配 `XUNARA_PLATFORM_ADMIN_TOKEN`，平台 API 默认 fail closed。写入 `/etc/xunara/xunarad.env`（0600）后 `systemctl restart xunarad` |
+| `/admin/` 500 | nginx 把 `/admin/index.html` 解析到了用户控制台的 root：确认 `location /admin/` 里有 `root /srv/xunara;` |
+| 注册报 `USER_LIMIT_REACHED` | 套餐成员配额：内置 Free 的 `max_users=1`（单租户等于「只有第一个用户」）。用平台 API/超管后台把租户调到 Pro/Business，或对自托管部署**不要**加 `-plans`（空值即关闭套餐配额） |
+| 首页一直是旧版控制台样式 | 浏览器命中了控制面内嵌的 `/console`；正式站点请用 `/`（用户控制台）与 `/admin/`（超管后台） |
 
 ## 相关仓库
 
