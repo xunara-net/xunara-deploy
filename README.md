@@ -66,12 +66,16 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 | `XUNARA_LISTEN` | `0.0.0.0:9090` | 控制面监听地址；nginx 同源部署时改成 `127.0.0.1:9190` |
 | `XUNARA_GRPC_LISTEN` | `127.0.0.1:9191` | 平台 gRPC，保持内网 |
 | `XUNARA_EXTRA_ARGS` | 空 | 追加到 ExecStart（如 `-derp-map /var/lib/xunara-relay/derp.json`） |
-
-控制面单元默认带 `-trusted-proxy`（控制面只经同机 nginx 暴露）：限流按
-`X-Forwarded-For` 的**最后一跳**计，也就是 nginx 追加的真实客户端地址；直接把
-控制面暴露到公网时必须去掉它，否则匿名调用者可以伪造该头绕过限流。
+| `XUNARA_TRUSTED_PROXY` | `false` | 仅同机可信 nginx 访问控制面时设为 `true` |
+| `XUNARA_ORG_CONFIG` | 空 | 多租户组织配置文件；设置后不再注入单租户参数 |
+| `XUNARA_MANAGED_DERP_MAP` | 空 | 托管租户公共中继 map；需同时设置 `XUNARA_ORG_CONFIG` |
+| `XUNARA_CONTROL_ADDR` | `127.0.0.1:9090` | 中继访问控制面的内部地址，与实际监听地址一致 |
 | `XUNARA_PASSKEY` | `false` | WebAuthn 需要 https 或 localhost |
 | `XUNARA_DERP_HOST` | 空 | 设置后一并部署 `xunara-relay` 并接入 DERP map |
+
+控制面默认不信任转发头。仅当控制面绑定本机地址、只经可信 nginx 暴露时，设置
+`XUNARA_TRUSTED_PROXY=true`：限流按 `X-Forwarded-For` 的最后一跳计。
+不要对直接暴露公网的控制面开启该选项，否则调用者可以伪造来源地址绕过限流。
 
 `install-web.sh` 同样接受 `XUNARA_HTTP_PORT`（默认 80，公网端口让给 nginx 时改成
 对外端口，如 9090）与 `XUNARA_UPSTREAM`（默认 `127.0.0.1:9090`，指向控制面的实际
@@ -80,7 +84,7 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 ```sh
 # 单端口同源部署（主机只放行 9090）：控制面退到 9190，nginx 占 9090
 ssh root@host 'XUNARA_LISTEN=127.0.0.1:9190 XUNARA_GRPC_LISTEN=127.0.0.1:9191 \
-  XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
+  XUNARA_TRUSTED_PROXY=true XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 ssh root@host 'XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127.0.0.1:9190 \
   ./install-web.sh /tmp/web-dist /tmp/admin-dist'
 ```
@@ -132,7 +136,7 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 \
 `/var/lib/xunara-relay/derp.json`，并把 `-derp-map` 接进控制面单元。中继有两种模式：
 
 - **独立模式（默认）**：`-verify-url http://127.0.0.1:9090/derp/admit`，准入问控制面，
-  控制面不可达即拒绝放行。
+  控制面不可达即拒绝放行。多租户安装自动改用 `/api/relay/v1/admit`，不依赖租户 Host。
 - **托管模式**：`XUNARA_RELAY_MANAGED=1` 时用 `-control-url` + 一次性
   `XUNARA_RELAY_ENROLL_TOKEN` 注册并心跳。注册契约见 xunara-relay 仓库
   `docs/relay-protocol.md`。控制面已实现 `/api/relay/v1/*`（注册与心跳），中继配额由
@@ -234,9 +238,22 @@ XUNARA_EXTRA_ARGS="-registration closed"  # 只允许管理员建号
 ```
 
 ```sh
-XUNARA_EXTRA_ARGS="-org-config /etc/xunara/orgs.json \
-  -platform-state-dir /var/lib/xunara/platform -plans builtin"
+sudo XUNARA_ORG_CONFIG=/etc/xunara/orgs.json \
+  XUNARA_LISTEN=127.0.0.1:9190 XUNARA_TRUSTED_PROXY=true \
+  XUNARA_CONTROL_ADDR=127.0.0.1:9190 XUNARA_DERP_HOST=derp.example.com \
+  XUNARA_EXTRA_ARGS="-plans builtin -network-pool 100.100.0.0/16" \
+  ./install.sh /tmp/xunarad /tmp/xunara-relay
 ```
+
+安装器使用 `XUNARA_STATE`（默认 `/var/lib/xunara`）作为平台状态根，不再把
+`-server-url`、`-state-dir`、`-allow-local-login` 等单租户参数混入多租户命令。
+各组织的访问地址、注册方式和中继策略在组织配置中设置。不要通过
+`XUNARA_EXTRA_ARGS` 追加 `-org-config`。
+
+已有公共中继、不需要重新生成证书时，以 `XUNARA_MANAGED_DERP_MAP` 指向它的 map，
+不设置 `XUNARA_DERP_HOST`。同时把现有中继的 `-verify-url` 改为
+`http://127.0.0.1:9190/api/relay/v1/admit`（端口须与控制面一致）。托管租户会在
+创建及重启恢复时取得该 map；配置文件中的组织仍使用自身的 `derp_map`。
 
 要求与行为：
 
@@ -248,6 +265,10 @@ XUNARA_EXTRA_ARGS="-org-config /etc/xunara/orgs.json \
   必须连同该目录一起；每个租户有自己的 Noise 密钥与 SQLite。
 - 入口站限流 5 租户/小时/IP；删除租户仍走平台 API（`DELETE
   /api/platform/v1/organizations/{org}`）。
+- 入口站旧 `/signup` 页面跳转到 `/register`；旧本地注册 API 拒绝创建公共租户
+  成员。用户必须走自助开通或目标租户自己的邀请流程。
+- 公共中继仅放行未过期、已注册且有效 map 包含该中继的租户节点；租户
+  `none` / `regions` 策略继续生效，不因为共享入口而绕过。
 - 只开放非标准端口（例如 nginx 独占 9090）时，`self_service.port` 必须写成该
   公网端口，否则新租户拿到的 URL 会指向 80/443。
 

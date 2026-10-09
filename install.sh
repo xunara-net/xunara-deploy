@@ -60,6 +60,21 @@ server_url=${XUNARA_SERVER_URL:-http://$(hostname -f 2>/dev/null || hostname):90
 listen_addr=${XUNARA_LISTEN:-0.0.0.0:9090}
 grpc_listen=${XUNARA_GRPC_LISTEN:-127.0.0.1:9191}
 passkey=${XUNARA_PASSKEY:-false}
+trusted_proxy=${XUNARA_TRUSTED_PROXY:-false}
+org_config=${XUNARA_ORG_CONFIG:-}
+managed_derp_map=${XUNARA_MANAGED_DERP_MAP:-}
+
+case "$trusted_proxy" in
+	true|false) ;;
+	*) echo "error: XUNARA_TRUSTED_PROXY must be true or false" >&2; exit 2 ;;
+esac
+if [ -n "$org_config" ]; then
+	[ -f "$org_config" ] || { echo "error: XUNARA_ORG_CONFIG must point to an existing file" >&2; exit 2; }
+	tenant_args="-org-config $org_config -platform-state-dir $state"
+else
+	[ -z "$managed_derp_map" ] || { echo "error: XUNARA_MANAGED_DERP_MAP requires XUNARA_ORG_CONFIG" >&2; exit 2; }
+	tenant_args="-server-url $server_url -state-dir $state -allow-local-login -passkey=$passkey"
+fi
 
 # sed 替换值里可能出现的分隔符与反斜杠，避免把单元文件写坏。
 escape() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
@@ -107,7 +122,11 @@ if [ -n "${XUNARA_DERP_HOST:-}" ]; then
 		[ -n "${XUNARA_RELAY_NAME:-}" ] || XUNARA_RELAY_NAME=$(hostname -f 2>/dev/null || hostname)
 		relay_mode_args="$relay_mode_args -relay-name $(escape "$XUNARA_RELAY_NAME") -relay-visibility ${XUNARA_RELAY_VISIBILITY:-private}"
 	else
-		relay_mode_args="-verify-url http://$control_addr/derp/admit"
+		if [ -n "$org_config" ]; then
+			relay_mode_args="-verify-url http://$control_addr/api/relay/v1/admit"
+		else
+			relay_mode_args="-verify-url http://$control_addr/derp/admit"
+		fi
 	fi
 
 	install -d -o xunara -g xunara -m 0700 "$relay_state"
@@ -126,14 +145,22 @@ if [ -n "${XUNARA_DERP_HOST:-}" ]; then
 		-derp-map-out "$relay_map" -derp-map-only
 	chown -R xunara:xunara "$relay_state"
 
-	relay_extra_args="-derp-map $relay_map"
+	if [ -n "$org_config" ]; then
+		managed_derp_map=${managed_derp_map:-$relay_map}
+	else
+		relay_extra_args="-derp-map $relay_map"
+	fi
+fi
+
+if [ -n "$managed_derp_map" ]; then
+	tenant_args="$tenant_args -managed-derp-map $managed_derp_map"
 fi
 
 # 渲染控制面单元：监听地址、server-url、passkey、DERP map 与额外参数都在这里落定。
 sed -e "s|@XUNARA_LISTEN@|$(escape "$listen_addr")|" \
 	-e "s|@XUNARA_GRPC_LISTEN@|$(escape "$grpc_listen")|" \
-	-e "s|@XUNARA_SERVER_URL@|$(escape "$server_url")|" \
-	-e "s|@XUNARA_PASSKEY@|$passkey|" \
+	-e "s|@XUNARA_TENANT_ARGS@|$(escape "$tenant_args")|" \
+	-e "s|@XUNARA_TRUSTED_PROXY@|$trusted_proxy|" \
 	-e "s|@XUNARA_EXTRA_ARGS@|$(escape "$relay_extra_args ${XUNARA_EXTRA_ARGS:-}")|" \
 	"$here/systemd/xunarad.service" >/etc/systemd/system/xunarad.service
 chmod 0644 /etc/systemd/system/xunarad.service

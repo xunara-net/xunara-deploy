@@ -25,14 +25,11 @@ StateDirectoryMode=0700
 # firewall allowlist.
 ExecStart=/opt/xunara/bin/xunarad \
     -listen @XUNARA_LISTEN@ \
-    -server-url @XUNARA_SERVER_URL@ \
-    -state-dir /var/lib/xunara \
+    @XUNARA_TENANT_ARGS@ \
     -grpc-listen @XUNARA_GRPC_LISTEN@ \
     -console-timezone Asia/Shanghai \
     -log-level info \
-    -allow-local-login \
-    -trusted-proxy \
-    -passkey=@XUNARA_PASSKEY@ \
+    -trusted-proxy=@XUNARA_TRUSTED_PROXY@ \
     @XUNARA_EXTRA_ARGS@
 
 Restart=on-failure
