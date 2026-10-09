@@ -214,6 +214,17 @@ sudo systemctl start xunarad
 
 ## 状态与备份
 
+网络控制台版本新增 **state v20/v21**（配置/历史、DNS 版本、中继地区/pin），身份仍为
+v13。升级顺序为 server → relay → web/admin；先完成公网入口维护、请求排空与控制面
+停止，再备份完整状态、配置、旧二进制和静态页面。旧版本拒绝新 schema，不能只
+恢复 `.previous` 二进制，也不能手动降 `user_version` 或删除表绕过保护。
+验收失败只在恢复公网写流量前同时恢复旧状态和旧产物；已恢复业务后不覆盖旧快照。
+
+默认、静态组织、动态自助组织及归档状态都应检查；旧设备、会话、DNS 和中继身份
+必须保留。旧地区 0 记录不会自动发布成私有地图，需升级并重新接入；不要重建现有
+公共中继证书或更换指纹。只升级管理面时无需改公共中继配置。操作边界以
+[服务端说明](https://github.com/xunara-net/xunara-server/blob/main/docs/network-console.md)为准。
+
 控制面状态全在 `/var/lib/xunara`：节点、用户、Session、预认证密钥、审计、策略
 快照、Flux 密文。**备份该目录即可**（先 `systemctl stop xunarad` 保证一致）。
 Session 存在状态目录而不是进程内存：重启不掉登录，也是多实例的前提。
