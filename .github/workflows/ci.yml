@@ -27,18 +27,26 @@ jobs:
       - name: Render systemd units
         run: |
           # 用安装脚本同样的占位符替换语法渲染一遍，能发现忘写的 @变量@。
-          sed -e 's|@XUNARA_LISTEN@|0.0.0.0:9090|' \
-              -e 's|@XUNARA_GRPC_LISTEN@|127.0.0.1:9191|' \
-              -e 's|@XUNARA_SERVER_URL@|http://example.com|' \
-              -e 's|@XUNARA_PASSKEY@|false|' \
-              -e 's|@XUNARA_EXTRA_ARGS@||' \
-              systemd/xunarad.service > /tmp/xunarad.service
+          render_control() {
+            sed -e 's|@XUNARA_LISTEN@|127.0.0.1:9190|' \
+                -e 's|@XUNARA_GRPC_LISTEN@|127.0.0.1:9191|' \
+                -e "s|@XUNARA_TENANT_ARGS@|$1|" \
+                -e 's|@XUNARA_TRUSTED_PROXY@|true|' \
+                -e 's|@XUNARA_EXTRA_ARGS@||' \
+                systemd/xunarad.service
+          }
+          render_control '-server-url http://example.com -state-dir /var/lib/xunara -allow-local-login -passkey=false' > /tmp/xunarad.service
+          render_control '-org-config /etc/xunara/orgs.json -platform-state-dir /var/lib/xunara' > /tmp/xunarad-multi.service
           sed -e 's|@XUNARA_DERP_HOST@|derp.example.com|' \
               -e 's|@XUNARA_DERP_PORT@|9091|' \
               -e 's|@XUNARA_RELAY_MODE_ARGS@|-verify-url http://127.0.0.1:9090/derp/admit|' \
               -e 's|@XUNARA_STUN_ARGS@|-stun=false|' \
               systemd/xunara-relay.service > /tmp/xunara-relay.service
-          ! grep -q '@XUNARA_' /tmp/xunarad.service /tmp/xunara-relay.service
+          ! grep -q '@XUNARA_' /tmp/xunarad.service /tmp/xunarad-multi.service /tmp/xunara-relay.service
+          grep -q -- '-server-url http://example.com' /tmp/xunarad.service
+          grep -q -- '-org-config /etc/xunara/orgs.json' /tmp/xunarad-multi.service
+          # 多租户不能重新混入单租户专属参数；仍保持现有安装器为唯一生产渲染实现。
+          ! grep -qE -- '(^|[[:space:]])-(server-url|state-dir|allow-local-login|passkey)([=[:space:]]|$)' /tmp/xunarad-multi.service
 
       - name: nginx config test
         run: |
