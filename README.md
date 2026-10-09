@@ -102,8 +102,9 @@ sudo cat /var/lib/xunara/setup-token     # 32 字节随机，0600
 ```
 
 浏览器打开 `http://<host>/setup`（或旧版控制台 `/console`），填入令牌、登录名与
-密码（至少 12 个字符）。提交后令牌文件立即删除，账号成为 `owner`，审计记录
-`admin.bootstrap`。
+密码（至少 12 个字符）。owner 资料、密码、会话与审计 `admin.bootstrap` 在同一
+租户身份事务提交；任一故障回滚，可持原令牌重试。成功后清理令牌文件，数据库的
+完成事实即使文件清理失败也阻止重放；不能用初始化表单重置已开通账户。
 
 ### 前端静态站点
 
@@ -166,21 +167,50 @@ docker build -f docker/Dockerfile.web -t ghcr.io/xunara-net/xunara-web:dev .
 
 ## 升级与回滚
 
+### 身份迁移 v13
+
+[原子 owner 初始化 ADR](https://github.com/xunara-net/xunara-server/blob/main/docs/adr/ADR-0017-atomic-owner-bootstrap.md)
+追加身份 schema v13。升级根据已有凭据或明确的完成审计回填，只读元数据和
+开通失败改为失败关闭；API 字段与官方客户端协议不变。部署顺序为服务端 →
+Web / Admin 静态产物 → 只读验收；新登录配置页不能配不支持正式第三方入口的旧服务端。
+
+- 先核对实际 service 的二进制、六仓库提交、配置、全部租户 / 平台数据库位置及
+  SHA-256；不能根据历史别名二进制判断线上版本。保留旧静态入口和配置 / 密钥。
+- 在公网 / 调用方进入维护状态、所有实例与写任务停下后，保存完整一致性备份；
+  包括主机外路径或平台 state 目录，不能一概假设默认目录就是全部状态。
+- 新版本迁移并通过健康、实际 `/version`、租户 / 用户 / 设备 / 套餐 / 网络不变、
+  配置与中继指纹不变、匿名受保护 API 拒绝等检查，才恢复公网写流量。
+- **v12 服务端拒绝 v13 状态。** 仍处于维护窗口时失败，应停止新服务、保留失败
+  现场，恢复相匹配的旧二进制、静态入口和完整旧状态（含所有权 / 权限及 WAL）。
+  不得仅回退二进制，也不得将旧 WAL 与新数据库混用；恢复后复核才开放流量。
+- 已经恢复公网业务后不能直接用旧快照覆盖新用户 / 设备 / 审计。此时先进入维护，
+  做数据核对与前向修复；需要数据级恢复时另行确认损失边界。
+
+下例只演示**默认路径、单实例**的停服备份；执行目录任意，需要运行主机的 sudo
+与已关闭的公网 / 本机写任务。自定义路径或多实例须先扩充备份与停止范围。
+
+```sh
+backup="/root/xunara-upgrade-$(date -u +%Y%m%dT%H%M%SZ)"
+sudo install -d -m 0700 "$backup"
+sudo systemctl stop xunarad
+sudo cp -p /opt/xunara/bin/xunarad "$backup/xunarad"
+sudo tar czf "$backup/state.tar.gz" -C /var/lib xunara
+sudo chmod 0600 "$backup/state.tar.gz"
+```
+
+`install.sh` 的 `.previous` 只是二进制备份，不代替以上数据库 / 静态站点 / 配置备份。
+安装前完成维护与备份，安装后按真实状态版本验证；不要对跨 schema 升级直接重复
+执行安装脚本当成安全回滚。只有已确认状态格式兼容时才可仅回退二进制：
+
 ```sh
 sudo systemctl stop xunarad
-sudo tar czf /root/xunara-state-$(date +%F).tar.gz -C /var/lib xunara
+sudo install -m 0755 /opt/xunara/bin/xunarad.previous /opt/xunara/bin/xunarad
 sudo systemctl start xunarad
 ```
 
-回滚二进制（状态格式不兼容时需要同时回滚状态备份）：
-
-```sh
-sudo install -m 0755 /opt/xunara/bin/xunarad.previous /opt/xunara/bin/xunarad
-sudo systemctl restart xunarad
-```
-
 升级后确认：`systemctl status xunarad`、`journalctl -u xunarad -n 50`、
-`curl -fsS http://127.0.0.1:9090/health`、浏览器打开 `/` 与 `/admin/`。
+实际监听地址的 `/health` 与 `/version`、浏览器打开 `/` 与 `/admin/`。检查日志时
+不得复制密钥文件内容到终端记录或把 Token 放进命令参数。
 
 ## 状态与备份
 
