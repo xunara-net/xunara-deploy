@@ -31,6 +31,7 @@ ExecStart=/opt/xunara/bin/xunarad \
     -console-timezone Asia/Shanghai \
     -log-level info \
     -allow-local-login \
+    -trusted-proxy \
     -passkey=@XUNARA_PASSKEY@ \
     @XUNARA_EXTRA_ARGS@
 

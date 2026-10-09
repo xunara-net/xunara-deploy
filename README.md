@@ -66,6 +66,10 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 | `XUNARA_LISTEN` | `0.0.0.0:9090` | 控制面监听地址；nginx 同源部署时改成 `127.0.0.1:9190` |
 | `XUNARA_GRPC_LISTEN` | `127.0.0.1:9191` | 平台 gRPC，保持内网 |
 | `XUNARA_EXTRA_ARGS` | 空 | 追加到 ExecStart（如 `-derp-map /var/lib/xunara-relay/derp.json`） |
+
+控制面单元默认带 `-trusted-proxy`（控制面只经同机 nginx 暴露）：限流按
+`X-Forwarded-For` 的**最后一跳**计，也就是 nginx 追加的真实客户端地址；直接把
+控制面暴露到公网时必须去掉它，否则匿名调用者可以伪造该头绕过限流。
 | `XUNARA_PASSKEY` | `false` | WebAuthn 需要 https 或 localhost |
 | `XUNARA_DERP_HOST` | 空 | 设置后一并部署 `xunara-relay` 并接入 DERP map |
 

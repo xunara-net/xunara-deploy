@@ -41,6 +41,8 @@ services:
       - -log-level
       - ${XUNARA_LOG_LEVEL:-info}
       - -allow-local-login
+      # 控制面只经同编排的 nginx 暴露：限流按 X-Forwarded-For 最后一跳计。
+      - -trusted-proxy
       - -passkey=${XUNARA_PASSKEY:-false}
     env_file:
       - ./.env
