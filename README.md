@@ -222,6 +222,7 @@ XUNARA_EXTRA_ARGS="-registration closed"  # 只允许管理员建号
     "site": "portal",
     "domain_suffix": "tailnet.example.com",
     "scheme": "https",
+    "port": "9090",
     "cookie_domain": "example.com",
     "plan": "free"
   }
@@ -243,6 +244,8 @@ XUNARA_EXTRA_ARGS="-org-config /etc/xunara/orgs.json \
   必须连同该目录一起；每个租户有自己的 Noise 密钥与 SQLite。
 - 入口站限流 5 租户/小时/IP；删除租户仍走平台 API（`DELETE
   /api/platform/v1/organizations/{org}`）。
+- 只开放非标准端口（例如 nginx 独占 9090）时，`self_service.port` 必须写成该
+  公网端口，否则新租户拿到的 URL 会指向 80/443。
 
 ## 配置
 
