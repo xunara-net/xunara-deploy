@@ -7,3 +7,12 @@
 - `/admin/` → `/srv/xunara/admin`（xunara-admin）
 - `/api/*`、`/key`、`/ts2021`、`/derp/*`、`/.well-known/*`、`/console` 等 → `127.0.0.1:9090`
 - 9091 DERP 端口必须由中继直接对外，**不要**放进 nginx 反代（证书指纹固定会失效）
+
+GET `/login` 属于用户 SPA；不要为了第三方登录按查询参数增加代理例外。
+升级后的提供方按钮通过 `/api/v1/auth/start` 开始浏览器认证，仍由既有 `/api/*`
+反代规则处理，回调走 `/oidc/*`。Web 保留旧提供方书签的薄转接。应先升级服务端
+再升级 Web，服务端 OIDC callback URI 仍需在发行方精确登记；不要从请求输入生成。
+
+成员邀请同样走 `/api/*` 同源反代。新代码只展示一次，注册地址与代码分开发送，
+不添加带代码链接或把认证凭据拼进 nginx 访问日志。决策与验收范围以服务端
+[ADR-0014](https://github.com/xunara-net/xunara-server/blob/main/docs/adr/ADR-0014-browser-auth-and-member-invitations.md) 为准。
