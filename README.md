@@ -197,6 +197,53 @@ Xunara 控制面强制（例如第 11 台设备返回 `DEVICE_LIMIT_REACHED`）�
 客户端协议不参与商业规则。租户套餐用超管后台或 `PATCH
 /api/platform/v1/organizations/{org}/plan` 调整。
 
+## 多租户与自助注册
+
+默认注册策略是 `invite`：由管理员发放一次性邀请码，注册出来的是**本租户的成员**。
+用 `-registration` 调整：
+
+```sh
+XUNARA_EXTRA_ARGS="-registration open"    # 任何人可注册（单租户部署注册为 member）
+XUNARA_EXTRA_ARGS="-registration closed"  # 只允许管理员建号
+```
+
+托管（一账号一 tailnet）需要三件事一起配：`-org-config` 里的 `self_service`、
+`-platform-state-dir`（托管组织与地址池记录）与 `-plans`（新租户必须落在套餐上）。
+入口站自身必须 `registration: "open"`，否则 xunarad 启动即报错：
+
+```json
+{
+  "organizations": [
+    {"id": "portal", "name": "Xunara Cloud", "domains": ["app.example.com"],
+     "server_url": "https://app.example.com", "state_dir": "/var/lib/xunara/portal",
+     "registration": "open"}
+  ],
+  "self_service": {
+    "site": "portal",
+    "domain_suffix": "tailnet.example.com",
+    "scheme": "https",
+    "cookie_domain": "example.com",
+    "plan": "free"
+  }
+}
+```
+
+```sh
+XUNARA_EXTRA_ARGS="-org-config /etc/xunara/orgs.json \
+  -platform-state-dir /var/lib/xunara/platform -plans builtin"
+```
+
+要求与行为：
+
+- `app.example.com` 需要解析到 nginx；`*.tailnet.example.com` 泛解析到同一地址。
+  `nginx/xunara.conf` 用 `server_name _`，任意租户域名都会被正确转发。
+- 访客在入口站注册后自动成为新租户 `<login>.tailnet.example.com` 的 owner；
+  配置 `cookie_domain` 时浏览器带着会话直接进入控制台，否则到新域名再登录一次。
+- 新租户的状态目录由平台在 `-platform-state-dir/orgs/` 下自动创建，备份/迁移
+  必须连同该目录一起；每个租户有自己的 Noise 密钥与 SQLite。
+- 入口站限流 5 租户/小时/IP；删除租户仍走平台 API（`DELETE
+  /api/platform/v1/organizations/{org}`）。
+
 ## 配置
 
 改 `/etc/systemd/system/xunarad.service` 的 `ExecStart`（监听地址、`-server-url`、
