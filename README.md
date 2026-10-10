@@ -126,8 +126,37 @@ ssh root@host './install-web.sh /tmp/web-dist /tmp/admin-dist'
 
 没有 DERP 时客户端可以注册但 netmap 里 `LiveDERPs=0`，界面上表现为一直「连接中」。
 
+### 已预编译：按服务器平台直接下载
+
+无需安装 Go 或自行编译。
+[v0.1.0-preview.1 发布页](https://github.com/xunara-net/xunara-relay/releases/tag/v0.1.0-preview.1)
+提供 Linux AMD64/ARM64/ARMv7、macOS Intel/Apple Silicon、Windows AMD64/ARM64
+七种可执行文件，附 `SHA256SUMS` 和 `BUILD.txt`。用户中心「我的中继 → 程序下载」
+也提供各目标直接下载按钮。请按中继服务器架构选择，不是手机浏览器的架构。
+
+以下仅用于 **Linux AMD64**，执行目录为新建的临时下载目录；需要 curl、GNU
+sha256sum 与安装权限。ARM64 对应 `xunara-relay_linux_arm64`，ARMv7 对应
+`xunara-relay_linux_armv7`，不要在不同架构服务器运行 AMD64 文件。
+
 ```sh
-# 在 xunara-relay 仓库构建 xunara-relay 后：
+download_dir="$(mktemp -d)" && cd "$download_dir"
+release='https://github.com/xunara-net/xunara-relay/releases/download/v0.1.0-preview.1'
+curl -fL --connect-timeout 10 --max-time 180 -O "$release/xunara-relay_linux_amd64" && \
+curl -fL --connect-timeout 10 --max-time 60 -O "$release/SHA256SUMS" && \
+sha256sum --ignore-missing --check SHA256SUMS && \
+install -m 0755 xunara-relay_linux_amd64 ./xunara-relay && \
+./xunara-relay -version
+```
+
+校验成功后再把临时目录的 `xunara-relay` 上传为目标主机 `/tmp/xunara-relay`，
+随后在目标 `xunara-deploy` 目录按下面安装步骤操作。已有服务升级前先完成维护、
+状态/凭据/证书备份，不要因为有新下载文件就直接重建当前公共中继。
+macOS 尚无 Apple 签名/公证；Windows 为命令行程序，不含服务安装器。交叉编译
+不是全 OS 现场验收；校验和不是独立签名，不提供自动升级。完整边界见
+[预编译说明](https://github.com/xunara-net/xunara-relay/blob/main/docs/precompiled-release.md)。
+
+```sh
+# 已取得并校验 xunara-relay 二进制，上传到目标主机 /tmp/xunara-relay 后：
 ssh root@host 'XUNARA_SERVER_URL=http://host:9090 \
   XUNARA_DERP_HOST=derp.example.com XUNARA_STUN_PORT=3478 \
   ./install.sh /tmp/xunarad /tmp/xunara-relay'
@@ -213,6 +242,14 @@ sudo systemctl start xunarad
 不得复制密钥文件内容到终端记录或把 Token 放进命令参数。
 
 ## 状态与备份
+
+地址/非托管地图版本追加 **state v23、plans v4**，identity v13 不变。平台数据库、
+所有活动/归档租户与前端产物一起备份；旧二进制不能直接打开新状态，不能手工
+降版本或删预留记录。新旧网段保守保留，旧设备不自动重编号，已有静态中继不需要
+重启。实际/期望应用失败会重试收敛，必须读取 pending 而不是只看 HTTP 成功。
+兼容与失败恢复以
+[ADR-0022](https://github.com/xunara-net/xunara-server/blob/main/docs/adr/ADR-0022-address-management-and-external-relays.md)
+及服务端网络控制台说明为准。
 
 网络控制台版本新增 **state v20/v21**（配置/历史、DNS 版本、中继地区/pin），身份仍为
 v13。升级顺序为 server → relay → web/admin；先完成公网入口维护、请求排空与控制面
