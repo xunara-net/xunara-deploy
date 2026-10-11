@@ -7,6 +7,11 @@ token / 到期 / 设备 / 套餐保持，state/plans 不变。来源和历史属
 迁移、真实旧产物演练与 API 以
 [服务端登录记录手册](https://github.com/xunara-net/xunara-server/blob/main/docs/account-login-history.md)为准。
 
+本人安全资料 JSON / 登录记录 CSV 导出不新增迁移，仍是 identity v18 / state v24 /
+plans v4；先更新服务端再更新 Web。导出不是完整运维备份，不含凭据，私人下载不应
+公开共享，平台令牌也不能代为导出。范围 / 限额 / 审计以
+[服务端账户导出说明](https://github.com/xunara-net/xunara-server/blob/main/docs/account-security-export.md)为准。
+
 平台辅助密码恢复追加 identity v17；旧用户 / 密码 / 会话默认不变，state/plans
 不变。升级前停止全部旧控制面并成套私有备份数据库、密封密钥、环境和产物，
 禁止新旧实例混用。原码仅显示一次，不进 URL / argv / 日志或浏览器持久存储；
