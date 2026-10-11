@@ -72,8 +72,12 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
 
 # 2) 安装控制面
 scp /tmp/xunarad root@host:/tmp/
-ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
+ssh root@host 'XUNARA_LISTEN=127.0.0.1:9190 XUNARA_TRUSTED_PROXY=true \
+  XUNARA_SERVER_URL=https://host:9090 ./install.sh /tmp/xunarad'
 ```
+
+此时仅安装内网控制面；先按下文配置 nginx HTTPS 和受信任证书，再初始化账户。
+兼容 HTTP 模式不适合传递公网密码、初始化令牌或正式 API 凭据。
 
 `install.sh` 可重复执行，就是升级路径：先备份 `/opt/xunara/bin/xunarad.previous`，
 再安装账号、状态目录、单元文件，最后 `enable --now`。
@@ -104,8 +108,11 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 ```sh
 # 单端口同源部署（主机只放行 9090）：控制面退到 9190，nginx 占 9090
 ssh root@host 'XUNARA_LISTEN=127.0.0.1:9190 XUNARA_GRPC_LISTEN=127.0.0.1:9191 \
-  XUNARA_TRUSTED_PROXY=true XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
-ssh root@host 'XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127.0.0.1:9190 \
+  XUNARA_TRUSTED_PROXY=true XUNARA_SERVER_URL=https://host:9090 ./install.sh /tmp/xunarad'
+# 先生成/安装包含实际 host SAN 的证书，再显式配置 TLS：
+ssh root@host 'XUNARA_NGINX_MODE=https XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127.0.0.1:9190 \
+  XUNARA_HTTPS_ORIGINS=https://host:9090 XUNARA_TLS_CERTIFICATE=/etc/xunara/tls/server-chain.pem \
+  XUNARA_TLS_KEY=/etc/xunara/tls/server.key \
   ./install-web.sh /tmp/web-dist /tmp/admin-dist'
 ```
 
@@ -121,7 +128,7 @@ ssh root@host 'XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127.0.0.1:9190 \
 sudo cat /var/lib/xunara/setup-token     # 32 字节随机，0600
 ```
 
-浏览器打开 `http://<host>/setup`（或旧版控制台 `/console`），填入令牌、登录名与
+证书验证正常后，浏览器打开 `https://<host>:9090/setup`（或旧版控制台 `/console`），填入令牌、登录名与
 密码（至少 12 个字符）。owner 资料、密码、会话与审计 `admin.bootstrap` 在同一
 租户身份事务提交；任一故障回滚，可持原令牌重试。成功后清理令牌文件，数据库的
 完成事实即使文件清理失败也阻止重放；不能用初始化表单重置已开通账户。
@@ -219,7 +226,8 @@ macOS 尚无 Apple 签名/公证；Windows 为命令行程序，不含服务安�
 
 ```sh
 # 已取得并校验 xunara-relay 二进制，上传到目标主机 /tmp/xunara-relay 后：
-ssh root@host 'XUNARA_SERVER_URL=http://host:9090 \
+ssh root@host 'XUNARA_LISTEN=127.0.0.1:9190 XUNARA_TRUSTED_PROXY=true \
+  XUNARA_CONTROL_ADDR=127.0.0.1:9190 XUNARA_SERVER_URL=https://host:9090 \
   XUNARA_DERP_HOST=derp.example.com XUNARA_STUN_PORT=3478 \
   ./install.sh /tmp/xunarad /tmp/xunara-relay'
 ```
