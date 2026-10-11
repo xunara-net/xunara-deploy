@@ -10,7 +10,7 @@ User=xunara
 Group=xunara
 WorkingDirectory=/var/lib/xunara
 
-# Secrets belong here, mode 0600: OIDC client secret, platform admin token,
+# Secrets belong here, mode 0600: OIDC/OAuth2 client secret, platform admin token,
 # webhook signing secret, DNS webhook token. They must never sit on the
 # command line, where every local user can read them from `ps`.
 EnvironmentFile=-/etc/xunara/xunarad.env

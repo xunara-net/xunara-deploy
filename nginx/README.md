@@ -10,8 +10,14 @@
 
 GET `/login` 属于用户 SPA；不要为了第三方登录按查询参数增加代理例外。
 升级后的提供方按钮通过 `/api/v1/auth/start` 开始浏览器认证，仍由既有 `/api/*`
-反代规则处理，回调走 `/oidc/*`。Web 保留旧提供方书签的薄转接。应先升级服务端
-再升级 Web，服务端 OIDC callback URI 仍需在发行方精确登记；不要从请求输入生成。
+反代规则处理，OIDC 回调走 `/oidc/*`，原生 OAuth2 回调走 `/oauth2/*`。
+Web 保留旧提供方书签的薄转接。应先升级服务端与 nginx 再升级 Web，回调仍须在
+提供方精确登记；不要从请求输入生成。systemd 和 Docker 配置均保持 GET `/login`
+为 SPA，兼容 POST `/login` 转后端，不按查询参数选择旧模板。
+
+OAuth2 提供方与密钥引用以[服务端配置说明](https://github.com/xunara-net/xunara-server/blob/main/docs/oauth2-login.md)
+为准；不要把 app secret 放入 nginx、URL 或进程参数。仅更新反代不会自动启用任何
+真实第三方提供方，仍需应用登记、HTTPS、client ID 和私密密钥引用。
 
 成员邀请同样走 `/api/*` 同源反代。新代码只展示一次，注册地址与代码分开发送，
 不添加带代码链接或把认证凭据拼进 nginx 访问日志。决策与验收范围以服务端
