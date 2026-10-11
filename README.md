@@ -40,6 +40,8 @@ systemd/xunara-relay.service    中继单元模板（自签名证书 + DERP map 
 env/xunarad.env.example         /etc/xunara/xunarad.env 模板（secret 只放这里）
 policy/policy.hujson.example    ACL 基线（默认 allow-all 会被安全页判为高危）
 nginx/xunara.conf               同源站点：控制台 / 管理后台 / 控制面 API
+nginx/render.py                 HTTP / HTTPS 共用的唯一站点渲染器
+nginx/smoke.py                  真实 nginx 与隔离安装器验收
 docker/docker-compose.yml       控制面 + 中继 + 前端一体化编排
 docker/Dockerfile.{server,relay,web}   从源码构建镜像
 docker/xunara.env.example       Compose 环境文件模板
@@ -95,7 +97,7 @@ ssh root@host 'XUNARA_SERVER_URL=http://host:9090 ./install.sh /tmp/xunarad'
 `XUNARA_TRUSTED_PROXY=true`：限流按 `X-Forwarded-For` 的最后一跳计。
 不要对直接暴露公网的控制面开启该选项，否则调用者可以伪造来源地址绕过限流。
 
-`install-web.sh` 同样接受 `XUNARA_HTTP_PORT`（默认 80，公网端口让给 nginx 时改成
+`install-web.sh` 同样接受 `XUNARA_HTTP_PORT`（HTTP 默认 80、HTTPS 默认 443，改成
 对外端口，如 9090）与 `XUNARA_UPSTREAM`（默认 `127.0.0.1:9090`，指向控制面的实际
 监听地址）。两个值必须与 `XUNARA_LISTEN` 对得上：
 
@@ -133,8 +135,9 @@ scp -r xunara-admin/dist root@host:/tmp/admin-dist
 ssh root@host './install-web.sh /tmp/web-dist /tmp/admin-dist'
 ```
 
-`install-web.sh` 把静态文件装到 `/srv/xunara/{web,admin}`，写入
-`/etc/nginx/conf.d/xunara.conf` 并 `nginx -t`。控制面只对 nginx 可达（`127.0.0.1`），
+`install-web.sh` 把静态文件装到 `/srv/xunara/{web,admin}`，已有
+`/etc/nginx/conf.d/xunara.conf` 时默认保留原配置，先 `nginx -t` 再复制静态文件和
+重载；没有站点时才渲染兼容 HTTP 模板。控制面只对 nginx 可达（`127.0.0.1`），
 公网端口归 nginx。
 
 会话 Cookie 是 HttpOnly + SameSite=Lax：**控制台必须和 API 同源**，不要把
@@ -146,6 +149,40 @@ ssh root@host './install-web.sh /tmp/web-dist /tmp/admin-dist'
 中继 9091 保持独立。证书、域名 SAN、原账户/设备保留、Secure Cookie、自助租户
 URL 和客户端信任的迁移步骤见 [自签 HTTPS 测试部署](nginx/self-signed-https.md)。
 测试证书不是公网受信任证书；后续更新前端也不能用默认 HTTP 模板覆盖已启用的 TLS。
+
+HTTP 链接和 HTTPS 正式入口可以共用同一套程序、账号与数据，不运行两套控制中心。
+同端口 HTTP 只对明确列出的站点、无查询参数的 GET/HEAD 页面导航返回 308；
+API、认证回调、POST、带 Cookie/认证头/请求体的明文请求返回 400，不转发后端。
+HTTP 与 HTTPS 仍是不同的浏览器源，不共享明文登录态。客户端、登录和 API 必须
+直接配置 HTTPS，重定向不能保护已经通过 HTTP 发送的凭据。
+
+安装器模式：
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `XUNARA_NGINX_MODE` | `auto` | 已有配置用 `preserve`；新站才用 `http` |
+| `XUNARA_NGINX_MODE=preserve` | — | 只更新前端，保留 TLS / 多租户 / 自定义 locations；要求站点存在 |
+| `XUNARA_NGINX_MODE=http` 或 `https` | — | 显式重新渲染整份站点，维护窗口内操作，不保留自定义 locations |
+| `XUNARA_HTTPS_ORIGINS` | 空 | HTTPS 模式必填，空格分隔的精确 origin，无路径、查询、用户信息或通配符 |
+| `XUNARA_TLS_CERTIFICATE` / `XUNARA_TLS_KEY` | 空 | HTTPS 模式必填，绝对文件路径；私钥内容不进命令行 |
+
+前置条件：Linux systemd、root、nginx；渲染新配置时还需要 Python 3。执行目录为
+`xunara-deploy`，先备份原站并确认所有控制面 URL、SAN 和提供方回调已迁移到 HTTPS。
+下面用于无额外自定义 location 的站点，替换域名与已有证书路径后执行：
+
+```sh
+sudo env XUNARA_NGINX_MODE=https XUNARA_HTTP_PORT=9090 \
+  XUNARA_UPSTREAM=127.0.0.1:9190 \
+  XUNARA_HTTPS_ORIGINS='https://xunara.example.test:9090 https://team.xunara.example.test:9090' \
+  XUNARA_TLS_CERTIFICATE=/etc/xunara/tls/server-chain.pem \
+  XUNARA_TLS_KEY=/etc/xunara/tls/server.key \
+  ./install-web.sh /tmp/web-dist /tmp/admin-dist
+```
+
+后续前端升级不传渲染参数，或显式使用 `XUNARA_NGINX_MODE=preserve`。原配置私有
+备份位于 `/var/lib/xunara-deploy/nginx.*`；校验/重载失败返回错误并恢复原配置文件，
+不忽略失败或自动重启。重载失败时静态文件可能已更新，不承诺完整发布自动回滚。
+自定义站点只替换入口 guard 的方法以 [nginx 手册](nginx/README.md) 为准。
 
 ## 中继（DERP）
 

@@ -25,10 +25,85 @@ fi
 
 here=$(cd "$(dirname "$0")" && pwd)
 root=/srv/xunara
-# 公网端口与上游：nginx 默认接 80，控制面默认在 127.0.0.1:9090。
-# 控制面不在 9090（例如已经让给 nginx）时用 XUNARA_UPSTREAM 指过去。
-http_port=${XUNARA_HTTP_PORT:-80}
-upstream=${XUNARA_UPSTREAM:-127.0.0.1:9090}
+config=/etc/nginx/conf.d/xunara.conf
+mode=${XUNARA_NGINX_MODE:-auto}
+case "$mode" in
+auto)
+	if [ -e "$config" ]; then mode=preserve; else mode=http; fi
+	;;
+preserve|http|https) ;;
+*) echo "error: XUNARA_NGINX_MODE must be auto, preserve, http or https" >&2; exit 2 ;;
+esac
+if [ "$mode" = preserve ] && [ ! -f "$config" ]; then
+	echo "error: preserve mode requires an existing nginx site" >&2
+	exit 2
+fi
+if [ "$mode" != preserve ] && [ -L "$config" ]; then
+	echo "error: a symlinked nginx site must use preserve mode" >&2
+	exit 2
+fi
+if ! command -v nginx >/dev/null 2>&1 || ! command -v systemctl >/dev/null 2>&1; then
+	echo "error: install nginx and systemd before installing this site" >&2
+	exit 2
+fi
+umask 077
+work=$(mktemp -d)
+config_changed=false
+complete=false
+backup=
+published=
+original_mode=
+original_owner=
+original_group=
+restore_config() {
+	if [ -n "$backup" ]; then
+		published=$(mktemp "$config.restored.XXXXXX")
+		install -o "$original_owner" -g "$original_group" -m "$original_mode" "$backup/nginx.conf" "$published"
+		mv "$published" "$config"
+	else
+		if [ -f "$config" ]; then find "$config" -maxdepth 0 -type f -delete; fi
+	fi
+}
+cleanup() {
+	run_status=$?
+	trap - 0
+	if [ "$config_changed" = true ] && [ "$complete" = false ]; then
+		restore_config
+		echo "error: nginx configuration restored; frontend files may already have been updated" >&2
+	fi
+	if [ -n "$published" ] && [ -f "$published" ]; then find "$published" -maxdepth 0 -type f -delete; fi
+	find "$work" -depth -delete
+	exit "$run_status"
+}
+trap cleanup 0
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if [ "$mode" != preserve ]; then
+	if ! command -v python3 >/dev/null 2>&1; then
+		echo "error: Python 3 is required to render nginx configuration" >&2
+		exit 2
+	fi
+	python3 "$here/nginx/render.py" --mode "$mode" >"$work/candidate.conf"
+	install -d -o root -g root -m 0755 /etc/nginx/conf.d
+	if [ -f "$config" ]; then
+		original_mode=$(stat -c '%a' "$config")
+		original_owner=$(stat -c '%u' "$config")
+		original_group=$(stat -c '%g' "$config")
+		install -d -o root -g root -m 0700 /var/lib/xunara-deploy
+		backup=$(mktemp -d /var/lib/xunara-deploy/nginx.XXXXXX)
+		install -o root -g root -m 0600 "$config" "$backup/nginx.conf"
+	fi
+	published=$(mktemp "$config.new.XXXXXX")
+	install -o root -g root -m 0644 "$work/candidate.conf" "$published"
+	# 配置失败发生在静态复制之前；原 nginx worker 在重载前仍使用旧配置。
+	config_changed=true
+	mv "$published" "$config"
+fi
+if ! nginx -t >"$work/nginx-validation.log" 2>&1; then
+	echo "error: nginx validation failed; diagnostics are not printed to avoid leaking configuration" >&2
+	exit 1
+fi
 
 install -d -o root -g root -m 0755 "$root/web"
 # --delete 保证旧构建里删掉的页面不会残留；dist 内容原样拷贝。
@@ -49,22 +124,23 @@ if [ -n "$ADMIN" ]; then
 	fi
 fi
 
-install -d -o root -g root -m 0755 /etc/nginx/conf.d
-sed -e "s|@XUNARA_HTTP_PORT_IPV4@|$http_port|" \
-	-e "s|@XUNARA_HTTP_PORT@|$http_port|" \
-	-e "s|@XUNARA_UPSTREAM@|$upstream|" \
-	"$here/nginx/xunara.conf" >/etc/nginx/conf.d/xunara.conf
-chmod 0644 /etc/nginx/conf.d/xunara.conf
-
-if command -v nginx >/dev/null 2>&1; then
-	nginx -t
-	systemctl reload nginx 2>/dev/null || systemctl restart nginx || true
+if systemctl is-active --quiet nginx; then
+	if ! systemctl reload nginx >"$work/nginx-reload.log" 2>&1; then
+		echo "error: nginx reload failed; do not assume the new configuration is active" >&2
+		exit 1
+	fi
+else
+	if ! systemctl start nginx >"$work/nginx-start.log" 2>&1; then
+		echo "error: nginx start failed" >&2
+		exit 1
+	fi
 fi
+complete=true
 
 echo "installed web:   $root/web"
 if [ -n "$ADMIN" ]; then
 	echo "installed admin: $root/admin"
 fi
-echo "nginx config: /etc/nginx/conf.d/xunara.conf"
-echo "listen:       $http_port   upstream: $upstream"
-echo "确保 80/443 已在防火墙放行；控制面 API 由 nginx 反代到 127.0.0.1:9090。"
+echo "nginx config: $config   mode: $mode"
+if [ -n "$backup" ]; then echo "private nginx backup: $backup"; fi
+echo "已有站点默认保留配置；公网登录和 API 请直接使用 HTTPS，中继端口保持独立。"
