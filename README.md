@@ -307,6 +307,13 @@ XUNARA_EXTRA_ARGS="-registration closed"  # 只允许管理员建号
 完整权限、API 和升级边界见[服务端设置手册](https://github.com/xunara-net/xunara-server/blob/main/docs/authentication-settings.md)。
 需要先升级 server 的 Identity v15，再发布 Web/Admin；不能只发布前端到旧服务端。
 
+账号禁用 / 解禁需要 server 的 Identity **v16**，再发布 Web/Admin。旧账号默认启用；
+已有第三方配置、密封密钥、会话和设备不因迁移而改变。切换前关闭外部写入并停止
+所有旧服务实例，不进行旧新认证逻辑混跑；完整备份数据库（含 WAL / SHM）、密封密钥、配置、旧程序及静态资源。
+旧程序拒绝较新 Identity 版本，不能仅覆盖二进制降级；公开写入恢复后不能直接回滚
+旧快照覆盖新数据。账号停用与设备 / 网络停服的区别及最新接口以
+[服务端账号状态手册](https://github.com/xunara-net/xunara-server/blob/main/docs/account-suspension.md) 为准。
+
 托管（一账号一 tailnet）需要三件事一起配：`-org-config` 里的 `self_service`、
 `-platform-state-dir`（托管组织与地址池记录）与 `-plans`（新租户必须落在套餐上）。
 入口站自身必须 `registration: "open"`，否则 xunarad 启动即报错：
