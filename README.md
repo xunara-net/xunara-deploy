@@ -62,6 +62,14 @@ docker/xunara.env.example       Compose 环境文件模板
 就让 nginx 监听 9090（`XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127.0.0.1:9190`），
 控制面退到 9190。
 
+## 私有中继独立安装
+
+用户中心「我的中继 → 接入指南」可生成 Linux systemd 参数化安装命令，下载
+固定发布版预编译程序并校验；独立 xunara-private-relay 服务不覆盖本仓库默认
+公共 xunara-relay 服务。一次性令牌隐藏读取，测试 CA 仅作用于中继进程。
+脚本、升级/回滚与健康观察范围以
+[relay 安装手册](https://github.com/xunara-net/xunara-relay/blob/main/docs/private-relay-install.md)为准。
+
 ## systemd 部署（单机）
 
 ```sh
