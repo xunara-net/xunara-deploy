@@ -293,12 +293,19 @@ Xunara 控制面强制（例如第 11 台设备返回 `DEVICE_LIMIT_REACHED`）�
 ## 多租户与自助注册
 
 默认注册策略是 `invite`：由管理员发放一次性邀请码，注册出来的是**本租户的成员**。
-用 `-registration` 调整：
+部署初始值用 `-registration` 调整：
 
 ```sh
 XUNARA_EXTRA_ARGS="-registration open"    # 任何人可注册（单租户部署注册为 member）
 XUNARA_EXTRA_ARGS="-registration closed"  # 只允许管理员建号
 ```
+
+部署后可在用户中心「登录与注册」（网络 owner）或后台同名页面（平台管理员，
+选择租户）持久调整成员注册与 OAuth2/OIDC，无需重启。已有运行时配置优先于
+部署初始值；公开独立开户与当前网络邀请是两种策略，前者只能由平台管理员启停。
+入口租户不允许匿名加入共享网络。关闭邀请码保留历史，可在成员页明确撤销。
+完整权限、API 和升级边界见[服务端设置手册](https://github.com/xunara-net/xunara-server/blob/main/docs/authentication-settings.md)。
+需要先升级 server 的 Identity v15，再发布 Web/Admin；不能只发布前端到旧服务端。
 
 托管（一账号一 tailnet）需要三件事一起配：`-org-config` 里的 `self_service`、
 `-platform-state-dir`（托管组织与地址池记录）与 `-plans`（新租户必须落在套餐上）。
@@ -366,8 +373,11 @@ sudo XUNARA_ORG_CONFIG=/etc/xunara/orgs.json \
 sudo systemctl daemon-reload && sudo systemctl restart xunarad
 ```
 
-Secret 只写 `/etc/xunara/xunarad.env`（OIDC client secret、平台 token、webhook
-签名密钥、DNS token），由 `*-env` 标志读取，不出现在 `ps`。
+受信部署 Secret 写 `/etc/xunara/xunarad.env`（OIDC client secret、平台 token、webhook
+签名密钥、DNS token），由 `*-env` 标志读取，不出现在 `ps`。页面创建的第三方应用
+Secret 仅通过受保护正文提交，以 AES-GCM 密封存入租户身份库，API 不回显。
+备份/恢复必须同时包含数据库及各租户状态目录下的 `authentication_secret.key`
+（0600）；丢失密钥会失败关闭。不要把密钥文件放进仓库或公开下载目录。
 
 ## HTTPS 与通行密钥
 
