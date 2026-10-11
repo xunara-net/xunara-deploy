@@ -19,6 +19,10 @@ OAuth2 提供方与密钥引用以[服务端配置说明](https://github.com/xun
 为准；不要把 app secret 放入 nginx、URL 或进程参数。仅更新反代不会自动启用任何
 真实第三方提供方，仍需应用登记、HTTPS、client ID 和私密密钥引用。
 
+仅放行一个公网端口时，可将该端口直接切换为 HTTPS，并让旧 HTTP 链接 308 跳转。
+自签测试 CA、权限、客户端信任、组织 URL 同步及回滚边界见
+[自签 HTTPS 测试部署](self-signed-https.md)。中继 9091 的 TLS 与指纹不随站点证书修改。
+
 成员邀请同样走 `/api/*` 同源反代。新代码只展示一次，注册地址与代码分开发送，
 不添加带代码链接或把认证凭据拼进 nginx 访问日志。决策与验收范围以服务端
 [ADR-0014](https://github.com/xunara-net/xunara-server/blob/main/docs/adr/ADR-0014-browser-auth-and-member-invitations.md) 为准。

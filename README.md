@@ -122,6 +122,13 @@ ssh root@host './install-web.sh /tmp/web-dist /tmp/admin-dist'
 会话 Cookie 是 HttpOnly + SameSite=Lax：**控制台必须和 API 同源**，不要把
 `xunara-web` 单独部署到另一个域名。
 
+### HTTPS 与自签测试证书
+
+单端口测试部署支持将 nginx 的公网 9090 改为 HTTPS；控制面仍监听本机 9190，
+中继 9091 保持独立。证书、域名 SAN、原账户/设备保留、Secure Cookie、自助租户
+URL 和客户端信任的迁移步骤见 [自签 HTTPS 测试部署](nginx/self-signed-https.md)。
+测试证书不是公网受信任证书；后续更新前端也不能用默认 HTTP 模板覆盖已启用的 TLS。
+
 ## 中继（DERP）
 
 没有 DERP 时客户端可以注册但 netmap 里 `LiveDERPs=0`，界面上表现为一直「连接中」。
