@@ -206,7 +206,7 @@ sudo env XUNARA_NGINX_MODE=https XUNARA_HTTP_PORT=9090 \
 ### 已预编译：按服务器平台直接下载
 
 无需安装 Go 或自行编译。
-[v0.1.0-preview.1 发布页](https://github.com/xunara-net/xunara-relay/releases/tag/v0.1.0-preview.1)
+[v0.1.0-preview.2 发布页](https://github.com/xunara-net/xunara-relay/releases/tag/v0.1.0-preview.2)
 提供 Linux AMD64/ARM64/ARMv7、macOS Intel/Apple Silicon、Windows AMD64/ARM64
 七种可执行文件，附 `SHA256SUMS` 和 `BUILD.txt`。用户中心「我的中继 → 程序下载」
 也提供各目标直接下载按钮。请按中继服务器架构选择，不是手机浏览器的架构。
@@ -217,7 +217,7 @@ sha256sum 与安装权限。ARM64 对应 `xunara-relay_linux_arm64`，ARMv7 对�
 
 ```sh
 download_dir="$(mktemp -d)" && cd "$download_dir"
-release='https://github.com/xunara-net/xunara-relay/releases/download/v0.1.0-preview.1'
+release='https://github.com/xunara-net/xunara-relay/releases/download/v0.1.0-preview.2'
 curl -fL --connect-timeout 10 --max-time 180 -O "$release/xunara-relay_linux_amd64" && \
 curl -fL --connect-timeout 10 --max-time 60 -O "$release/SHA256SUMS" && \
 sha256sum --ignore-missing --check SHA256SUMS && \
