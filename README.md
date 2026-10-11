@@ -1,5 +1,12 @@
 # xunara-deploy
 
+本人独立登录记录追加 identity v18；旧 Session 事实回填但不猜来源，原密码 /
+token / 到期 / 设备 / 套餐保持，state/plans 不变。来源和历史属于私人账户信息，
+同样纳入受保护备份；目前随账号保留，不提供自动限期清理。CI 全绿、停止全部
+旧控制面并成套备份后更新，不混版本滚动运行；已开放写入后不能用旧快照覆盖。
+迁移、真实旧产物演练与 API 以
+[服务端登录记录手册](https://github.com/xunara-net/xunara-server/blob/main/docs/account-login-history.md)为准。
+
 平台辅助密码恢复追加 identity v17；旧用户 / 密码 / 会话默认不变，state/plans
 不变。升级前停止全部旧控制面并成套私有备份数据库、密封密钥、环境和产物，
 禁止新旧实例混用。原码仅显示一次，不进 URL / argv / 日志或浏览器持久存储；
