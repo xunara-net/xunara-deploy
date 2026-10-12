@@ -165,6 +165,10 @@ ssh root@host './install-web.sh /tmp/web-dist /tmp/admin-dist'
 URL 和客户端信任的迁移步骤见 [自签 HTTPS 测试部署](nginx/self-signed-https.md)。
 测试证书不是公网受信任证书；后续更新前端也不能用默认 HTTP 模板覆盖已启用的 TLS。
 
+已有 HTTPS 站点可按[正式证书安装与轮换](nginx/production-certificate.md)仅更新
+nginx 证书并 reload；单域证书按 SNI 隔离，其他租户与 9091 DERP 不能一起换链。
+私钥和原 ZIP 不进 Git，本流程不提供自动续期。
+
 HTTP 链接和 HTTPS 正式入口可以共用同一套程序、账号与数据，不运行两套控制中心。
 同端口 HTTP 只对明确列出的站点、无查询参数的 GET/HEAD 页面导航返回 308；
 API、认证回调、POST、带 Cookie/认证头/请求体的明文请求返回 400，不转发后端。

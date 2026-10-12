@@ -24,6 +24,10 @@ OAuth2 提供方与密钥引用以[服务端配置说明](https://github.com/xun
 自签测试 CA、权限、客户端信任、组织 URL 同步及回滚边界见
 [自签 HTTPS 测试部署](self-signed-https.md)。中继 9091 的 TLS 与指纹不随站点证书修改。
 
+已经启用 HTTPS 的站点改用受信任证书，按
+[正式证书安装与轮换](production-certificate.md)检查完整链、域名与密钥，再只
+reload nginx。单域证书不覆盖其他租户；SNI、暂存私钥清理和续期边界必须分别验收。
+
 ## 单一渲染器与升级保护
 
 `render.py` 是 systemd 站点的唯一生产渲染实现；`install-web.sh` 和 CI 都调用它。
