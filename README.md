@@ -431,6 +431,13 @@ sudo XUNARA_ORG_CONFIG=/etc/xunara/orgs.json \
 
 要求与行为：
 
+- 仅有入口正式单域证书、不能保证租户泛 DNS 时，在 `self_service` 中添加
+  `console_url`，值等于入口 `server_url` 的完整 origin。新版 Server/Web/nginx
+  使用同域 `/t/<org>/` 网页；已有账号直接用原密码登录该网络，不需要重新开户。
+  全量迁移、Cookie/回调边界及多地址池、Linux 冲突保护见
+  [服务端手册](https://github.com/xunara-net/xunara-server/blob/main/docs/shared-console-and-address-pools.md)。
+  **这不替代官方客户端所需的租户 DNS/受信证书，也不能把网页路径用作 login-server。**
+
 - `app.example.com` 需要解析到 nginx；`*.tailnet.example.com` 泛解析到同一地址。
   `nginx/xunara.conf` 用 `server_name _`，任意租户域名都会被正确转发。
 - 访客在入口站注册后自动成为新租户 `<login>.tailnet.example.com` 的 owner；

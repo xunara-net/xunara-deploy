@@ -189,6 +189,21 @@ def main():
                 raise RuntimeError('isolated nginx not ready')
             mark('real-nginx-verified-tls-and-single-listener')
 
+            with receipt_lock:
+                receipts.clear()
+            assert request(port, 'portal.test:' + str(port), '/t/alice/api/v2/network/addresses', context=context)[0] == 200
+            with receipt_lock:
+                assert len(receipts) == 1 and receipts[0]['path'] == '/t/alice/api/v2/network/addresses'
+                assert receipts[0]['host'] == 'portal.test:' + str(port)
+                receipts.clear()
+            assert b'isolated web fixture' in request(port, 'portal.test:' + str(port), '/t/alice/dashboard', context=context)[2]
+            with receipt_lock:
+                assert not receipts
+            mark('shared-console-api-keeps-canonical-port-and-ui-is-not-control-protocol')
+            status, headers, _ = request(port, 'portal.test:' + str(port), '/t/alice/dashboard')
+            assert status == 308 and headers['Location'] == 'https://portal.test:' + str(port) + '/t/alice/dashboard'
+            assert request(port, 'portal.test:' + str(port), '/t/alice/api/v1/auth/session')[0] == 400
+
             for hostname in ['portal.test', 'team.test', '127.0.0.1', '[::1]', 'PORTAL.TEST']:
                 for pathname in ['/', '/login', '/register', '/settings', '/devices/fixture-id', '/admin/login', '/api']:
                     status, headers, payload = request(port, hostname + ':' + str(port), pathname)
@@ -237,7 +252,7 @@ def main():
             with receipt_lock:
                 assert len(receipts) == 2 and all(receipt['scheme'] == 'https' for receipt in receipts)
                 assert receipts[-1]['method'] == 'POST' and receipts[-1]['body'] == b'{"probe":true}'
-                assert receipts[0]['host'] == 'team.test'
+                assert receipts[0]['host'] == 'team.test:' + str(port)
             mark('https-spa-admin-and-backend-method-forwarding-unchanged')
 
             result = run(['docker', 'run', '--rm', '--entrypoint', 'sh',
