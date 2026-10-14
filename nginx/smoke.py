@@ -200,6 +200,12 @@ def main():
             with receipt_lock:
                 assert not receipts
             mark('shared-console-api-keeps-canonical-port-and-ui-is-not-control-protocol')
+            for pathname in ['/device/fixture/login', '/t/alice/register/fixture', '/t/alice/ssh/check/fixture']:
+                assert request(port, 'portal.test:' + str(port), pathname, context=context)[0] == 200
+                with receipt_lock:
+                    assert len(receipts) == 1 and receipts[0]['path'] == pathname
+                    receipts.clear()
+            mark('shared-device-and-ssh-authorization-reach-core-not-spa')
             status, headers, _ = request(port, 'portal.test:' + str(port), '/t/alice/dashboard')
             assert status == 308 and headers['Location'] == 'https://portal.test:' + str(port) + '/t/alice/dashboard'
             assert request(port, 'portal.test:' + str(port), '/t/alice/api/v1/auth/session')[0] == 400

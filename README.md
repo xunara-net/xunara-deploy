@@ -1,5 +1,12 @@
 # xunara-deploy
 
+共享账户入口可启用 `self_service.console_url` 与 `self_service.native_gateway`：
+用户只用普通登录名和密码登录，不需要网络标识；官方客户端使用同一规范 HTTPS
+入口，浏览器登录后仍须独立确认设备授权。组织注册表追加 v3，不更换原证书或
+Noise 密钥；旧设备只补录原归属，删除租户后同名注册建立全新身份。先停旧实例、
+完整私有备份，再更新 Server、Web 与 nginx，不能混版本运行。详见
+[共享原生接入 ADR](https://github.com/xunara-net/xunara-server/blob/main/docs/adr/ADR-0045-explicit-native-tenant-ingress.md)。
+
 本人独立登录记录追加 identity v18；旧 Session 事实回填但不猜来源，原密码 /
 token / 到期 / 设备 / 套餐保持，state/plans 不变。来源和历史属于私人账户信息，
 同样纳入受保护备份；目前随账号保留，不提供自动限期清理。CI 全绿、停止全部
