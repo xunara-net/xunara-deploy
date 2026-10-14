@@ -132,6 +132,10 @@ def main():
                 (work / surface).mkdir(mode=0o755)
                 (work / surface / 'index.html').write_text('<main>isolated ' + surface + ' fixture</main>')
                 (work / surface / 'index.html').chmod(0o644)
+            (work / 'web/network-check.sh').write_text('#!/bin/sh\nexit 0\n')
+            (work / 'web/network-check.sh').chmod(0o644)
+            (work / 'web/network-check.py').write_text('retired-file-must-never-be-served')
+            (work / 'web/network-check.py').chmod(0o644)
             port = free_port()
             environment = {'XUNARA_HTTP_PORT': str(port), 'XUNARA_UPSTREAM': '127.0.0.1:' + str(backend.server_port),
                 'XUNARA_HTTPS_ORIGINS': ' '.join('https://' + hostname + ':' + str(port)
@@ -188,6 +192,17 @@ def main():
             else:
                 raise RuntimeError('isolated nginx not ready')
             mark('real-nginx-verified-tls-and-single-listener')
+
+            status, headers, payload = request(port, 'portal.test:' + str(port), '/network-check.sh', context=context)
+            assert status == 200 and payload == b'#!/bin/sh\nexit 0\n'
+            assert headers['Content-Type'] == 'text/plain' and headers['Cache-Control'] == 'no-store'
+            assert headers['X-Content-Type-Options'] == 'nosniff'
+            assert request(port, 'portal.test:' + str(port), '/network-check.py', context=context)[0] == 410
+            (work / 'web/network-check.sh').unlink()
+            assert request(port, 'portal.test:' + str(port), '/network-check.sh', context=context)[0] == 404
+            with receipt_lock:
+                assert not receipts
+            mark('shell-checker-download-retired-python-and-missing-file-fail-closed')
 
             with receipt_lock:
                 receipts.clear()

@@ -68,10 +68,20 @@ server 中用 location 片段替换旧 `error_page 497`，不复制第二套反�
 ## 验证
 
 前置条件：Python 3、OpenSSL、Docker，能取得 `nginx:1.27-alpine` 与 Alpine Python
-包。执行目录为 `xunara-deploy`，运行 `python3 nginx/smoke.py`：16 阶段验证真实
+包。执行目录为 `xunara-deploy`，运行 `python3 nginx/smoke.py`，分阶段验证真实
 nginx 的同端口 HTTP/HTTPS、TLS 验证、租户/Host/方法/凭据边界和安装器失败恢复。
 隔离容器内仅 systemd 调度用显式 fixture，其余 renderer、文件复制与 `nginx -t`
 都是真实实现；不修改生产文件或使用真实账户。重载 fixture 不等于生产 systemd 验收。
+
+## 接入前网络检查器
+
+用户设备下载 `/network-check.sh`，仅需 Linux 的 Shell、iproute2、awk、mktemp、
+timeout 等基础工具，不依赖 Python。独立诊断和安装接入命令使用同一检查器。
+nginx 原文提供 Shell 文件、不缓存；缺失时返回 404，不能回落到 SPA。
+旧 `/network-check.py` 返回 410，即使磁盘上仍有旧文件也不能下载；不能做语言间重定向。
+升级时使用新 web 构建并清除旧静态文件，`install-web.sh` 的同步已包含旧文件清理。
+保留现有 nginx 配置的站点需同步这两个精确 `location`（普通部署与容器模板均已提供），
+执行 `nginx -t` 后重载；不要为更新下载脚本而改动正式证书、控制面数据或中继端口。
 
 成员邀请同样走 `/api/*` 同源反代。新代码只展示一次，注册地址与代码分开发送，
 不添加带代码链接或把认证凭据拼进 nginx 访问日志。决策与验收范围以服务端
