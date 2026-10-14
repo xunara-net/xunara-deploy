@@ -62,8 +62,8 @@ def http_upgrade_map(entries):
     lines.extend(['}', '', 'map $uri $xunara_http_navigation {', '    default 0;', '    "/" 1;',
         '    "~^/(api/|register/)" 0;',
         '    "~^/t/[a-z0-9][a-z0-9-]{0,31}/(api/|register/)" 0;',
-        '    "~^/t/[a-z0-9][a-z0-9-]{0,31}/(login|register|dashboard|devices|network|topology|permissions|members|authentication|dns|routes|api|security|plan|audit|settings|reset-password)(/.*)?$" 1;',
-        '    "~^/(login|register|dashboard|devices|network|topology|permissions|members|dns|routes|api|security|plan|audit|settings)(/.*)?$" 1;',
+        '    "~^/t/[a-z0-9][a-z0-9-]{0,31}/(login|register|dashboard|devices|network|topology|permissions|members|authentication|dns|routes|api|security|plan|audit|settings|reset-password|change-password)(/.*)?$" 1;',
+        '    "~^/(login|register|dashboard|devices|network|topology|permissions|members|dns|routes|api|security|plan|audit|settings|reset-password|change-password)(/.*)?$" 1;',
         '    "~^/admin(/.*)?$" 1;', '}'])
     return '\n'.join(lines)
 

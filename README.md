@@ -12,10 +12,11 @@ plans v4；先更新服务端再更新 Web。导出不是完整运维备份，�
 公开共享，平台令牌也不能代为导出。范围 / 限额 / 审计以
 [服务端账户导出说明](https://github.com/xunara-net/xunara-server/blob/main/docs/account-security-export.md)为准。
 
-平台辅助密码恢复追加 identity v17；旧用户 / 密码 / 会话默认不变，state/plans
-不变。升级前停止全部旧控制面并成套私有备份数据库、密封密钥、环境和产物，
-禁止新旧实例混用。原码仅显示一次，不进 URL / argv / 日志或浏览器持久存储；
-平台应通过可信 HTTPS 和已核实的独立渠道交付，不冒充邮件找回。API / 升级与
+超管直接重置随机临时密码追加 identity v19；旧用户 / 密码 / 会话默认不变，旧码
+停用，state/plans 不变。升级前停止全部旧控制面并成套私有备份数据库、密封密钥、
+环境和产物，禁止新旧实例混用；旧二进制不能读取 v19 库。新 `/change-password`
+是用户首次改密页面，HTTP 只允许安全导航到 HTTPS，不允许明文提交任何密码。
+平台通过可信 HTTPS 和已核实的独立渠道交付临时密码，不冒充邮件找回。API / 升级与
 回退以 [服务端说明](https://github.com/xunara-net/xunara-server/blob/main/docs/password-recovery.md) 为准。
 
 Xunara 玄序的**部署仓库**：把所有组件装到一台主机（systemd）或一个 Compose

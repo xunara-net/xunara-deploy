@@ -244,6 +244,15 @@ def main():
                 assert receipts == []
             mark('no-plaintext-credential-body-upgrade-or-backend-request')
 
+            for pathname in ['/change-password', '/t/team/change-password', '/reset-password', '/t/team/reset-password']:
+                status, headers, payload = request(port, 'portal.test:' + str(port), pathname)
+                assert status == 308 and headers['Location'] == 'https://portal.test:' + str(port) + pathname
+                assert request(port, 'portal.test:' + str(port), pathname, context=context)[0] == 200
+                assert request(port, 'portal.test:' + str(port), pathname, method='POST', body=b'probe')[0] == 400
+            with receipt_lock:
+                assert receipts == []
+            mark('temporary-password-pages-navigate-only-no-plaintext-writes')
+
             assert request(port, 'team.test:' + str(port), '/admin/login', context=context)[0] == 200
             status, headers, payload = request(port, 'team.test:' + str(port), '/health', context=context)
             assert status == 200 and json.loads(payload)['fixture'] == 'isolated-nginx-only'
