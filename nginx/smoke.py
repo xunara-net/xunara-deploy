@@ -64,6 +64,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         with receipt_lock:
             receipts.append({'method': self.command, 'path': self.path,
                 'host': self.headers.get('Host'), 'scheme': self.headers.get('X-Forwarded-Proto'), 'body': body})
+        if self.path.split('?', 1)[0].endswith('/login') and self.path.startswith('/t/'):
+            self.send_response(302 if self.command in ('GET', 'HEAD') else 405)
+            if self.command in ('GET', 'HEAD'):
+                self.send_header('Location', '/login')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         payload = json.dumps({'fixture': 'isolated-nginx-only', 'method': self.command}).encode()
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -215,6 +223,14 @@ def main():
             with receipt_lock:
                 assert not receipts
             mark('shared-console-api-keeps-canonical-port-and-ui-is-not-control-protocol')
+            for tenant in ['alice', 'deleted', 'gggg']:
+                status, headers, payload = request(port, 'portal.test:' + str(port), '/t/' + tenant + '/login', context=context)
+                assert status == 302 and headers['Location'] == '/login' and headers['Cache-Control'] == 'no-store'
+                assert request(port, 'portal.test:' + str(port), '/t/' + tenant + '/login', context=context, method='POST')[0] == 405
+                with receipt_lock:
+                    assert len(receipts) == 2 and all(receipt['path'] == '/t/' + tenant + '/login' for receipt in receipts)
+                    receipts.clear()
+            mark('legacy-tenant-login-reaches-account-router-not-spa')
             for pathname in ['/device/fixture/login', '/t/alice/register/fixture', '/t/alice/ssh/check/fixture']:
                 assert request(port, 'portal.test:' + str(port), pathname, context=context)[0] == 200
                 with receipt_lock:

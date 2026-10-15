@@ -73,6 +73,14 @@ nginx 的同端口 HTTP/HTTPS、TLS 验证、租户/Host/方法/凭据边界和�
 隔离容器内仅 systemd 调度用显式 fixture，其余 renderer、文件复制与 `nginx -t`
 都是真实实现；不修改生产文件或使用真实账户。重载 fixture 不等于生产 systemd 验收。
 
+## 统一账户登录
+
+共享控制台登录入口统一为 `/login`，`/t/<org>/login` 不再作为 SPA 展示。
+这类旧书签精确反代到新版账户路由，GET / HEAD 临时跳转到统一入口，POST 拒绝。
+现存或已删除的租户都不固定登录范围；退出、过期会话和改密也回到统一入口。
+已验证账户的 `/t/<org>/` 控制台、Cookie、API 与第三方回调仍保持隔离。
+升级时先更新服务端，再同步 web 与 nginx 的旧登录反代规则；保留正式证书、端口和状态库。
+
 ## 接入前网络检查器
 
 用户设备下载 `/network-check.sh`，仅需 Linux 的 Shell、iproute2、awk、mktemp、
