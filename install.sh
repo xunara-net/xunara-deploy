@@ -74,7 +74,12 @@ esac
 case "$stun_port" in
 	'') [ "$stun_unadvertised" = false ] || { echo "error: unadvertised STUN requires XUNARA_STUN_PORT" >&2; exit 2; } ;;
 	*[!0-9]*) echo "error: XUNARA_STUN_PORT must be a numeric UDP port" >&2; exit 2 ;;
-	*) [ "$stun_port" -ge 1 ] && [ "$stun_port" -le 65535 ] || { echo "error: XUNARA_STUN_PORT must be between 1 and 65535" >&2; exit 2; } ;;
+	*)
+		if ! [ "$stun_port" -ge 1 ] || ! [ "$stun_port" -le 65535 ]; then
+			echo "error: XUNARA_STUN_PORT must be between 1 and 65535" >&2
+			exit 2
+		fi
+		;;
 esac
 
 case "$trusted_proxy" in
