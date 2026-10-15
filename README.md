@@ -4,6 +4,10 @@
 本次不新增功能或迁移，正式 HTTPS、原配置及中继保持；验收和回退边界见
 [发布记录](docs/releases/2026-10-15-code-cleanup.md)。
 
+2026-10-15 新增独立 [Rust 精简客户端](https://github.com/xunara-net/xunara-client)，
+并升级正式中继、启用本机 `9091/UDP`。公网映射尚未通过，未广播可用 STUN；
+不重启控制面或更换中继身份，详见 [客户端与 UDP 验收](docs/releases/2026-10-15-rust-client-and-udp.md)。
+
 共享账户入口可启用 `self_service.console_url` 与 `self_service.native_gateway`：
 用户只用普通登录名和密码登录，不需要网络标识；官方客户端使用同一规范 HTTPS
 入口，浏览器登录后仍须独立确认设备授权。组织注册表追加 v3，不更换原证书或

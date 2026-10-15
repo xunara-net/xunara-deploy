@@ -30,6 +30,7 @@
 #   XUNARA_DERP_PORT         中继公网端口（默认 9091）
 #   XUNARA_CONTROL_ADDR     控制面地址（默认 127.0.0.1:9090）
 #   XUNARA_STUN_PORT         开启 STUN 的 UDP 端口；不设置则不启用
+#   XUNARA_STUN_UNADVERTISED true 时只开本机 STUN，不广播尚未验证的公网端点（默认 false）
 #   XUNARA_RELAY_MANAGED     设为 1 时中继走托管注册（需要 /etc/xunara/xunarad.env
 #                            里的 XUNARA_RELAY_ENROLL_TOKEN，且控制面已实现
 #                            /api/relay/v1/enroll）
@@ -63,6 +64,18 @@ passkey=${XUNARA_PASSKEY:-false}
 trusted_proxy=${XUNARA_TRUSTED_PROXY:-false}
 org_config=${XUNARA_ORG_CONFIG:-}
 managed_derp_map=${XUNARA_MANAGED_DERP_MAP:-}
+stun_port=${XUNARA_STUN_PORT:-}
+stun_unadvertised=${XUNARA_STUN_UNADVERTISED:-false}
+
+case "$stun_unadvertised" in
+	true|false) ;;
+	*) echo "error: XUNARA_STUN_UNADVERTISED must be true or false" >&2; exit 2 ;;
+esac
+case "$stun_port" in
+	'') [ "$stun_unadvertised" = false ] || { echo "error: unadvertised STUN requires XUNARA_STUN_PORT" >&2; exit 2; } ;;
+	*[!0-9]*) echo "error: XUNARA_STUN_PORT must be a numeric UDP port" >&2; exit 2 ;;
+	*) [ "$stun_port" -ge 1 ] && [ "$stun_port" -le 65535 ] || { echo "error: XUNARA_STUN_PORT must be between 1 and 65535" >&2; exit 2; } ;;
+esac
 
 case "$trusted_proxy" in
 	true|false) ;;
@@ -112,10 +125,16 @@ if [ -n "${XUNARA_DERP_HOST:-}" ]; then
 		echo "error: XUNARA_DERP_HOST is set but $prefix/bin/xunara-relay is missing" >&2
 		exit 2
 	fi
-	if [ -n "${XUNARA_STUN_PORT:-}" ]; then
-		stun_args="-stun -stun-port $XUNARA_STUN_PORT"
+	if [ -n "$stun_port" ]; then
+		stun_args="-stun -stun-port $stun_port"
+		set -- -stun -stun-port "$stun_port"
 	else
 		stun_args="-stun=false"
+		set -- -stun=false
+	fi
+	if [ "$stun_unadvertised" = true ]; then
+		stun_args="$stun_args -stun-unadvertised"
+		set -- "$@" -stun-unadvertised
 	fi
 	if [ "${XUNARA_RELAY_MANAGED:-0}" = "1" ]; then
 		relay_mode_args="-control-url $(escape "${XUNARA_RELAY_CONTROL_URL:-http://127.0.0.1:9090}") -enroll-token-env XUNARA_RELAY_ENROLL_TOKEN"
@@ -142,7 +161,7 @@ if [ -n "${XUNARA_DERP_HOST:-}" ]; then
 	"$prefix/bin/xunara-relay" -listen "127.0.0.1:$derp_port" \
 		-hostname "$XUNARA_DERP_HOST" -state-dir "$relay_state" \
 		-cert-mode selfsigned -cert-dir "$relay_state/certs" \
-		-derp-map-out "$relay_map" -derp-map-only
+		-derp-map-out "$relay_map" -derp-map-only "$@"
 	chown -R xunara:xunara "$relay_state"
 
 	if [ -n "$org_config" ]; then
