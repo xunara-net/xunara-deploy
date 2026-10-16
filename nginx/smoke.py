@@ -223,6 +223,14 @@ def main():
             with receipt_lock:
                 assert not receipts
             mark('shared-console-api-keeps-canonical-port-and-ui-is-not-control-protocol')
+            for pathname in ['/console', '/console/ssh-check', '/t/alice/console/ssh-check', '/ui/prefs', '/t/alice/ui/prefs']:
+                for method in ['GET', 'HEAD', 'POST']:
+                    status, headers, payload = request(port, 'portal.test:' + str(port), pathname, context=context, method=method)
+                    assert status == 200 and headers['Content-Type'] == 'application/json'
+                    with receipt_lock:
+                        assert len(receipts) == 1 and receipts[0]['path'] == pathname and receipts[0]['method'] == method
+                        receipts.clear()
+            mark('retired-console-and-public-preferences-reach-core-not-spa')
             for tenant in ['alice', 'deleted', 'gggg']:
                 status, headers, payload = request(port, 'portal.test:' + str(port), '/t/' + tenant + '/login', context=context)
                 assert status == 302 and headers['Location'] == '/login' and headers['Cache-Control'] == 'no-store'

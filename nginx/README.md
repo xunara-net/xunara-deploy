@@ -5,7 +5,8 @@
 
 - `/` → `/srv/xunara/web`（xunara-web）
 - `/admin/` → `/srv/xunara/admin`（xunara-admin）
-- `/api/*`、`/key`、`/ts2021`、`/derp/*`、`/.well-known/*`、`/console` 等 → `127.0.0.1:9090`
+- `/api/*`、`/key`、`/ts2021`、`/derp/*`、`/.well-known/*` 等 → `127.0.0.1:9090`
+- `/console/*` 与 `/t/<org>/console/*` → Core 的退役处理器：已知旧书签迁移至 Web，旧表单 410；不再提供内嵌用户中心
 - 9091 DERP 端口必须由中继直接对外，**不要**放进 nginx 反代（证书指纹固定会失效）
 
 GET `/login` 属于用户 SPA；不要为了第三方登录按查询参数增加代理例外。
@@ -74,6 +75,11 @@ nginx 的同端口 HTTP/HTTPS、TLS 验证、租户/Host/方法/凭据边界和�
 都是真实实现；不修改生产文件或使用真实账户。重载 fixture 不等于生产 systemd 验收。
 
 ## 统一账户登录
+
+完整旧中心已退役。升级时先发布新版 Web（安全中心包含 SSH 审批记录），再发布服务端并
+同步模板中的独立退役 `location`：旧地址不能落回 SPA、旧静态页或另一租户。
+独立授权页的 `/ui/prefs` 继续代理到 Core；`/register/*`、`/ssh/check/*` 及其租户路径
+是官方客户端所需的浏览器批准入口，不能随旧中心删除。保留证书、Cookie 边界与现有数据。
 
 共享控制台登录入口统一为 `/login`，`/t/<org>/login` 不再作为 SPA 展示。
 这类旧书签精确反代到新版账户路由，GET / HEAD 临时跳转到统一入口，POST 拒绝。

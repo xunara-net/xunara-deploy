@@ -152,7 +152,7 @@ ssh root@host 'XUNARA_NGINX_MODE=https XUNARA_HTTP_PORT=9090 XUNARA_UPSTREAM=127
 sudo cat /var/lib/xunara/setup-token     # 32 字节随机，0600
 ```
 
-证书验证正常后，浏览器打开 `https://<host>:9090/setup`（或旧版控制台 `/console`），填入令牌、登录名与
+证书验证正常后，浏览器打开 `https://<host>:9090/setup`，填入令牌、登录名与
 密码（至少 12 个字符）。owner 资料、密码、会话与审计 `admin.bootstrap` 在同一
 租户身份事务提交；任一故障回滚，可持原令牌重试。成功后清理令牌文件，数据库的
 完成事实即使文件清理失败也阻止重放；不能用初始化表单重置已开通账户。
@@ -513,7 +513,7 @@ RP ID 是域名，**不要**用 IP 部署通行密钥。
 | 平台 API 401 / `/admin/` 登录失败 | 未配 `XUNARA_PLATFORM_ADMIN_TOKEN`，平台 API 默认 fail closed。写入 `/etc/xunara/xunarad.env`（0600）后 `systemctl restart xunarad` |
 | `/admin/` 500 | nginx 把 `/admin/index.html` 解析到了用户控制台的 root：确认 `location /admin/` 里有 `root /srv/xunara;` |
 | 注册报 `USER_LIMIT_REACHED` | 套餐成员配额：内置 Free 的 `max_users=1`（单租户等于「只有第一个用户」）。用平台 API/超管后台把租户调到 Pro/Business，或对自托管部署**不要**加 `-plans`（空值即关闭套餐配额） |
-| 首页一直是旧版控制台样式 | 浏览器命中了控制面内嵌的 `/console`；正式站点请用 `/`（用户控制台）与 `/admin/`（超管后台） |
+| 仍能看到 `Xunara console` 旧页 | 不是只清缓存：确认运行中的服务端已升级并退役旧 `/console`；新版本旧书签跳转到 Web，旧表单返回 410。同步根与租户代理规则；正式入口是 `/` 与 `/admin/` |
 
 ## 相关仓库
 
