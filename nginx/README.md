@@ -35,7 +35,8 @@ reload nginx。单域证书不覆盖其他租户；SNI、暂存私钥清理和�
 默认 `auto` 已有站点就保留，避免前端升级覆盖 TLS、多租户、自定义 CA 下载等配置。
 新站才采用原 HTTP 引导模式；它不是安全的公网登录部署。显式 `http` / `https`
 重新渲染会替换完整站点；证书签发、控制面 URL 与第三方回调迁移仍需单独完成。
-Docker 原模板保持不变，本切片不提供完整 Compose TLS 安装或证书自动续期。
+Docker 同步浏览器与 API 分流，但不改变原来的 TLS 职责；这里不提供完整
+Compose TLS 安装或证书自动续期。
 
 HTTPS 模式使用精确 origin allowlist：每个允许 Host 只跳回自己的固定 origin；
 未知 Host 不回落到主域或其他租户，不使用未经约束的转发头。标准 443 接受域名
@@ -84,6 +85,9 @@ nginx 的同端口 HTTP/HTTPS、TLS 验证、租户/Host/方法/凭据边界和�
 浏览器通过 `/api/v1/browser/*` 与 `/api/v1/auth/setup` 读取状态和提交确认。
 旧设备/SSH/登录/初始化/passkey/后台表单明确 410，不转发到 Core。
 必须配套发布 server、Web 和 nginx；保留证书、Cookie 边界与现有数据。
+已有自定义 TLS 站点的 `auto` 安装模式只保留原站点，不会自动迁移这些 locations；
+不能只更新 dist。应备份后手工对齐分流、拒绝旧 POST 的 map 和规则，
+通过 `nginx -t` 后再 reload，不要用完整重新渲染覆盖正在使用的证书与 Host 策略。
 
 共享控制台登录入口统一为 `/login`，`/t/<org>/login` 不再作为 SPA 展示。
 这类旧书签精确反代到新版账户路由，GET / HEAD 临时跳转到统一入口，POST 拒绝。
