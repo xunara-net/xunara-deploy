@@ -14,7 +14,7 @@ GET `/login` 属于用户 SPA；不要为了第三方登录按查询参数增加
 反代规则处理，OIDC 回调走 `/oidc/*`，原生 OAuth2 回调走 `/oauth2/*`。
 Web 保留旧提供方书签的薄转接。应先升级服务端与 nginx 再升级 Web，回调仍须在
 提供方精确登记；不要从请求输入生成。systemd 和 Docker 配置均保持 GET `/login`
-为 SPA，兼容 POST `/login` 转后端，不按查询参数选择旧模板。
+为 SPA；旧 POST `/login` 明确 410，不按查询参数选择旧模板。
 
 OAuth2 提供方与密钥引用以[服务端配置说明](https://github.com/xunara-net/xunara-server/blob/main/docs/oauth2-login.md)
 为准；不要把 app secret 放入 nginx、URL 或进程参数。仅更新反代不会自动启用任何
@@ -78,8 +78,12 @@ nginx 的同端口 HTTP/HTTPS、TLS 验证、租户/Host/方法/凭据边界和�
 
 完整旧中心已退役。升级时先发布新版 Web（安全中心包含 SSH 审批记录），再发布服务端并
 同步模板中的独立退役 `location`：旧地址不能落回 SPA、旧静态页或另一租户。
-独立授权页的 `/ui/prefs` 继续代理到 Core；`/register/*`、`/ssh/check/*` 及其租户路径
-是官方客户端所需的浏览器批准入口，不能随旧中心删除。保留证书、Cookie 边界与现有数据。
+`/ui/prefs` 只兼容跳转到新设置页，不再写旧页面偏好 Cookie。
+`/register/*`、`/ssh/check/*`、`/device/*`、`/setup` 以及对应租户浏览器路径
+全部交给独立 Web。客户端浏览器 URL 不能删除，但也不能再反代到旧模板。
+浏览器通过 `/api/v1/browser/*` 与 `/api/v1/auth/setup` 读取状态和提交确认。
+旧设备/SSH/登录/初始化/passkey/后台表单明确 410，不转发到 Core。
+必须配套发布 server、Web 和 nginx；保留证书、Cookie 边界与现有数据。
 
 共享控制台登录入口统一为 `/login`，`/t/<org>/login` 不再作为 SPA 展示。
 这类旧书签精确反代到新版账户路由，GET / HEAD 临时跳转到统一入口，POST 拒绝。

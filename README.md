@@ -471,7 +471,7 @@ sudo XUNARA_ORG_CONFIG=/etc/xunara/orgs.json \
   必须连同该目录一起；每个租户有自己的 Noise 密钥与 SQLite。
 - 入口站限流 5 租户/小时/IP；删除租户仍走平台 API（`DELETE
   /api/platform/v1/organizations/{org}`）。
-- 入口站旧 `/signup` 页面跳转到 `/register`；旧本地注册 API 拒绝创建公共租户
+- 入口站 `/signup` 由独立 Web 跳转到 `/register`，旧表单提交明确 410；本地注册 API 拒绝创建公共租户
   成员。用户必须走自助开通或目标租户自己的邀请流程。
 - 公共中继仅放行未过期、已注册且有效 map 包含该中继的租户节点；租户
   `none` / `regions` 策略继续生效，不因为共享入口而绕过。

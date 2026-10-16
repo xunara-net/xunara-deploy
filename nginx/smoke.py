@@ -239,12 +239,27 @@ def main():
                     assert len(receipts) == 2 and all(receipt['path'] == '/t/' + tenant + '/login' for receipt in receipts)
                     receipts.clear()
             mark('legacy-tenant-login-reaches-account-router-not-spa')
-            for pathname in ['/device/fixture/login', '/t/alice/register/fixture', '/t/alice/ssh/check/fixture']:
+            for pathname in ['/login', '/setup', '/signup', '/register/fixture', '/ssh/check/fixture',
+                    '/device/fixture', '/t/alice/register/fixture', '/t/alice/ssh/check/fixture', '/t/alice/setup']:
+                status, headers, payload = request(port, 'portal.test:' + str(port), pathname, context=context)
+                assert status == 200 and b'isolated web fixture' in payload
+                with receipt_lock:
+                    assert not receipts
+            mark('all-browser-authorization-and-setup-pages-use-independent-spa')
+            for pathname in ['/login', '/setup', '/signup', '/logout', '/register/fixture/approve',
+                    '/ssh/check/fixture/deny', '/device/fixture/login', '/t/alice/register/fixture/approve',
+                    '/t/alice/ssh/check/fixture/deny', '/admin/login', '/admin/plans/save', '/passkey/login/begin']:
+                assert request(port, 'portal.test:' + str(port), pathname, context=context, method='POST')[0] == 410
+                with receipt_lock:
+                    assert not receipts
+            mark('retired-browser-and-admin-forms-never-reach-core')
+            for pathname in ['/api/v1/auth/setup', '/api/v1/browser/device-flows/fixture',
+                    '/t/alice/api/v1/browser/device-authorizations/fixture', '/t/alice/api/v1/browser/ssh-checks/fixture']:
                 assert request(port, 'portal.test:' + str(port), pathname, context=context)[0] == 200
                 with receipt_lock:
                     assert len(receipts) == 1 and receipts[0]['path'] == pathname
                     receipts.clear()
-            mark('shared-device-and-ssh-authorization-reach-core-not-spa')
+            mark('browser-json-apis-keep-host-port-and-tenant-boundaries')
             status, headers, _ = request(port, 'portal.test:' + str(port), '/t/alice/dashboard')
             assert status == 308 and headers['Location'] == 'https://portal.test:' + str(port) + '/t/alice/dashboard'
             assert request(port, 'portal.test:' + str(port), '/t/alice/api/v1/auth/session')[0] == 400
